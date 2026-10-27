@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plano en Planta: Cimentación y Estructura - Nave Industrial 40x20m</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;600;700&display=swap');
+
+        :root {
+            --bg-cad: #050a14;
+            --panel-bg: rgba(10, 20, 38, 0.92);
+            --border-cad: #00e5ff;
+            --text-main: #cce8ff;
+            --axis-color: #ff007f;
+            --footing-color: #00e5ff;
+            --pedestal-color: #ffaa00;
+            --tiebeam-color: #39ff14;
+            --wall-color: #7d8b99;
+            --plate-color: #e0e0e0;
+            --text-dim: #ff007f;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-cad);
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--text-main);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER / TOOLBAR SUPERIOR */
+        header {
+            height: 52px;
+            background: var(--panel-bg);
+            border-bottom: 2px solid var(--border-cad);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 20;
+            box-shadow: 0 4px 20px rgba(0, 229, 255, 0.15);
+        }
+
+        .title-block {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .title-block h1 {
+            font-size: 1.1rem;
+            color: var(--border-cad);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .tag {
+            background: rgba(0, 229, 255, 0.15);
+            border: 1px solid var(--border-cad);
+            color: var(--border-cad);
+            padding: 2px 8px;
+            font-size: 0.75rem;
+            border-radius: 3px;
+        }
+
+        .hud-stats {
+            display: flex;
+            gap: 25px;
+            font-size: 0.8rem;
+        }
+
+        .hud-stats div span {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+
+        /* CONTENEDOR PRINCIPAL */
+        .viewport {
+            flex: 1;
+            position: relative;
+            cursor: grab;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(rgba(0, 229, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+            background-size: 25px 25px;
+        }
+
+        .viewport:active {
+            cursor: grabbing;
+        }
+
+        svg#blueprint {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* ESTILOS SVG CAD */
+        .grid-line { stroke: rgba(0, 229, 255, 0.08); stroke-width: 1; }
+        
+        /* Ejes */
+        .layer-axes line {
+            stroke: var(--axis-color);
+            stroke-width: 1.5;
+            stroke-dasharray: 12 6 2 6;
+            opacity: 0.75;
+        }
+        .axis-bubble {
+            fill: #0a1426;
+            stroke: var(--axis-color);
+            stroke-width: 2;
+        }
+        .axis-text {
+            fill: var(--axis-color);
+            font-size: 16px;
+            font-weight: bold;
+            font-family: 'Share Tech Mono', monospace;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+
+        /* Zapatas */
+        .footing-z1 {
+            fill: rgba(0, 229, 255, 0.08);
+            stroke: var(--footing-color);
+            stroke-width: 2;
+            transition: all 0.2s;
+        }
+        .footing-z2 {
+            fill: rgba(0, 229, 255, 0.14);
+            stroke: var(--footing-color);
+            stroke-width: 2.5;
+            transition: all 0.2s;
+        }
+
+        /* Trabes de liga */
+        .tie-beam {
+            fill: rgba(57, 255, 20, 0.1);
+            stroke: var(--tiebeam-color);
+            stroke-width: 1.5;
+            stroke-dasharray: 6 3;
+        }
+
+        /* Muro de enrase */
+        .stem-wall {
+            fill: rgba(125, 139, 153, 0.15);
+            stroke: var(--wall-color);
+            stroke-width: 1.5;
+        }
+
+        /* Pedestales */
+        .pedestal {
+            fill: rgba(255, 170, 0, 0.25);
+            stroke: var(--pedestal-color);
+            stroke-width: 1.8;
+        }
+
+        /* Placas base y columnas */
+        .base-plate {
+            fill: rgba(224, 224, 224, 0.4);
+            stroke: var(--plate-color);
+            stroke-width: 1.2;
+        }
+        .column-profile {
+            fill: #050a14;
+            stroke: #ffffff;
+            stroke-width: 1.5;
+        }
+        .anchor-bolt {
+            fill: #ff007f;
+        }
+
+        /* Cotas */
+        .dim-line {
+            stroke: var(--text-dim);
+            stroke-width: 1;
+        }
+        .dim-text {
+            fill: var(--text-dim);
+            font-size: 13px;
+            font-family: 'Share Tech Mono', monospace;
+            text-anchor: middle;
+        }
+
+        /* Interactividad Hotspots */
+        .interactive-element {
+            cursor: pointer;
+        }
+        .interactive-element:hover {
+            filter: drop-shadow(0 0 8px #00e5ff);
+            stroke-width: 3.5 !important;
+        }
+
+        /* CONTROLES FLOTANTES LATERALES (LAYERS & NAV) */
+        .controls-panel {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-cad);
+            border-radius: 6px;
+            padding: 15px;
+            width: 220px;
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            color: var(--border-cad);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(0, 229, 255, 0.3);
+            padding-bottom: 5px;
+        }
+
+        .layer-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+
+        .layer-toggle input {
+            accent-color: var(--border-cad);
+            cursor: pointer;
+        }
+
+        .zoom-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 15px;
+        }
+
+        .btn-cad {
+            flex: 1;
+            background: rgba(0, 229, 255, 0.1);
+            border: 1px solid var(--border-cad);
+            color: var(--border-cad);
+            padding: 6px 0;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+
+        .btn-cad:hover {
+            background: var(--border-cad);
+            color: #000;
+        }
+
+        /* PANEL INFORMATIVO DERECHO (INSPECTOR) */
+        .inspector-panel {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-cad);
+            border-radius: 6px;
+            padding: 18px;
+            width: 320px;
+            z-index: 10;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+        }
+
+        .inspector-title {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.95rem;
+            color: #ffaa00;
+            margin-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 170, 0, 0.3);
+            padding-bottom: 6px;
+        }
+
+        .prop-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            border-bottom: 1px stroke rgba(255, 255, 255, 0.05);
+            padding-bottom: 4px;
+        }
+
+        .prop-label {
+            color: #88a0b8;
+        }
+
+        .prop-value {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .code-tag {
+            background: rgba(255, 0, 127, 0.2);
+            color: #ff007f;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-family: monospace;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        /* FOOTER DE ESTADO */
+        footer {
+            height: 28px;
+            background: rgba(5, 10, 20, 0.95);
+            border-top: 1px solid rgba(0, 229, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 0.75rem;
+            color: #6688aa;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title-block">
+            <h1>Plano de Cimentación & Estructura</h1>
+            <span class="tag">NAVE 40x20m</span>
+            <span class="tag" style="border-color:#ffaa00; color:#ffaa00;">NORMA: AISC 360 / ACI 318</span>
+        </div>
+        <div class="hud-stats">
+            <div>Vol. Concreto Total: <span id="stat-concrete">78.4 m³</span></div>
+            <div>Acero de Refuerzo (Rebar): <span id="stat-rebar">5,420 kg</span></div>
+            <div>Acero Estructural A36: <span id="stat-steel">14,400 kg</span></div>
+        </div>
+    </header>
+
+    <div class="viewport" id="viewport">
+        <!-- CAPAS Y CONTROLES -->
+        <div class="controls-panel">
+            <div class="panel-title">Capas (Layers)</div>
+            <label class="layer-toggle"><input type="checkbox" id="chk-axes" checked> Ejes Estructurales</label>
+            <label class="layer-toggle"><input type="checkbox" id="chk-footings" checked> Zapatas (Z-1 / Z-2)</label>
+            <label class="layer-toggle"><input type="checkbox" id="chk-pedestals" checked> Pedestales (P-1)</label>
+            <label class="layer-toggle"><input type="checkbox" id="chk-tiebeams" checked> Trabes de Liga (TL-1)</label>
+            <label class="layer-toggle"><input type="checkbox" id="chk-wall" checked> Muro de Enrase</label>
+            <label class="layer-toggle"><input type="checkbox" id="chk-plates" checked> Placas y Columnas</label>
+            <label class="layer-toggle"><input type="checkbox" id="chk-dims" checked> Cotas y Aotaciones</label>
+
+            <div class="zoom-controls">
+                <button class="btn-cad" id="btn-zoom-in">Zoom +</button>
+                <button class="btn-cad" id="btn-zoom-out">Zoom -</button>
+                <button class="btn-cad" id="btn-reset">Reset</button>
+            </div>
+        </div>
+
+        <!-- INSPECTOR TÉCNICO -->
+        <div class="inspector-panel" id="inspector">
+            <div class="inspector-title" id="elem-title">Haz Clic en un Elemento</div>
+            <div id="inspector-content">
+                <p style="color: #6688aa; font-size: 0.8rem;">Selecciona cualquier zapata, pedestal, columna o trabe para inspeccionar sus dimensiones, armado de acero y memoria de cálculo.</p>
+            </div>
+        </div>
+
+        <!-- CANVAS SVG -->
+        <svg id="blueprint" viewBox="0 0 1600 1000">
+            <g id="main-group" transform="translate(180, 100) scale(1)">
+                <!-- GRUPO DE DIBUJO DENTRO DE JS -->
+            </g>
+        </svg>
+    </div>
+
+    <footer>
+        <div>SISTEMA DE COORDENADAS CAD: ORTOGONAL ESCALADO (1m = 25px)</div>
+        <div id="coords-display">X: 0.00m | Y: 0.00m</div>
+        <div>PROYECTO: NAVE INDUSTRIAL BODEGA A36/f'c=250</div>
+    </footer>
+
+    <script>
+        // DATOS TÉCNICOS DEL PROYECTO
+        const scale = 25; // 25 px = 1 metro
+        const widthMeters = 40; // Ejes 1 a 5 (4 vanos de 10m)
+        const depthMeters = 20; // Ejes A a C (2 vanos de 10m)
+
+        // Referencias DOM
+        const svg = document.getElementById('blueprint');
+        const mainGroup = document.getElementById('main-group');
+        const viewport = document.getElementById('viewport');
+        const coordsDisplay = document.getElementById('coords-display');
+        const inspectorTitle = document.getElementById('elem-title');
+        const inspectorContent = document.getElementById('inspector-content');
+
+        // Estado Zoom & Pan
+        let zoom = 1;
+        let panX = 180;
+        let panY = 100;
+        let isDragging = false;
+        let startX, startY;
+
+        // Ejes
+        const axesX = ['1', '2', '3', '4', '5'];
+        const axesY = ['A', 'B', 'C'];
+        const spanX = 10 * scale; // 250px
+        const spanY = 10 * scale; // 250px
+
+        // Cargar capas dinámicas
+        function initBlueprint() {
+            mainGroup.innerHTML = '';
+
+            // Capa Trabes de Liga / Contratrabes
+            const gTieBeams = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gTieBeams.id = 'layer-tiebeams';
+
+            // Capa Muro de Enrase
+            const gWall = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gWall.id = 'layer-wall';
+
+            // Capa Zapatas
+            const gFootings = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gFootings.id = 'layer-footings';
+
+            // Capa Pedestales
+            const gPedestals = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gPedestals.id = 'layer-pedestals';
+
+            // Capa Placas / Columnas
+            const gPlates = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gPlates.id = 'layer-plates';
+
+            // Capa Ejes
+            const gAxes = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gAxes.id = 'layer-axes';
+            gAxes.className.baseVal = 'layer-axes';
+
+            // Capa Cotas
+            const gDims = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            gDims.id = 'layer-dims';
+
+            // 1. DIBUJAR TRABES DE LIGA (TL-1: 30x50cm)
+            // Horizontales
+            for(let j=0; j<axesY.length; j++) {
+                const y = j * spanY;
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', 0);
+                rect.setAttribute('y', y - 3.75); // 0.30m = 7.5px alto
+                rect.setAttribute('width', 40 * scale);
+                rect.setAttribute('height', 7.5);
+                rect.setAttribute('class', 'tie-beam interactive-element');
+                rect.addEventListener('click', () => inspectElement('TL-1', 'Trabe de Liga Horizontal', '30 x 50 cm', "Concreto f'c=250 kg/cm²", "4 Var. #5 (5/8'') + Estribos #3 @ 15cm", 'Absorbe asentamientos diferidos y esfuerzos sísmicos transversales.'));
+                gTieBeams.appendChild(rect);
+            }
+            // Verticales
+            for(let i=0; i<axesX.length; i++) {
+                const x = i * spanX;
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', x - 3.75);
+                rect.setAttribute('y', 0);
+                rect.setAttribute('width', 7.5);
+                rect.setAttribute('height', 20 * scale);
+                rect.setAttribute('class', 'tie-beam interactive-element');
+                rect.addEventListener('click', () => inspectElement('TL-1', 'Trabe de Liga Vertical', '30 x 50 cm', "Concreto f'c=250 kg/cm²", "4 Var. #5 (5/8'') + Estribos #3 @ 15cm", 'Liga perimetral de rígidez estructural.'));
+                gTieBeams.appendChild(rect);
+            }
+
+            // 2. MURO DE ENRASE PERIMETRAL (M-1: 20cm espesor)
+            const wallRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            wallRect.setAttribute('x', -2.5);
+            wallRect.setAttribute('y', -2.5);
+            wallRect.setAttribute('width', 40 * scale + 5);
+            wallRect.setAttribute('height', 20 * scale + 5);
+            wallRect.setAttribute('class', 'stem-wall interactive-element');
+            wallRect.addEventListener('click', () => inspectElement('M-1', 'Muro de Enrase Perimetral', 'Espesor 20 cm | H = 1.00 m', 'Bloque de concreto / Concreto armado', 'Cadena de enrase CD-1 (20x20cm) 4 Var #3', 'Soporta faldón arquitectónico de lámina y nivelación de piso.'));
+            gWall.appendChild(wallRect);
+
+            // 3. ZAPATAS Y PEDESTALES (En cada intersección)
+            for(let i=0; i<axesX.length; i++) {
+                for(let j=0; j<axesY.length; j++) {
+                    const cx = i * spanX;
+                    const cy = j * spanY;
+                    const isCentral = (j === 1); // Eje B es central
+
+                    // Zapata
+                    const zSize = isCentral ? (2.6 * scale) : (2.2 * scale); // Z-2: 2.6m, Z-1: 2.2m
+                    const zName = isCentral ? 'Z-2' : 'Z-1';
+                    const footing = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    footing.setAttribute('x', cx - zSize/2);
+                    footing.setAttribute('y', cy - zSize/2);
+                    footing.setAttribute('width', zSize);
+                    footing.setAttribute('height', zSize);
+                    footing.setAttribute('class', (isCentral ? 'footing-z2' : 'footing-z1') + ' interactive-element');
+                    
+                    const axisLabel = `${axesY[j]}-${axesX[i]}`;
+                    footing.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if(isCentral) {
+                            inspectElement(`Zapata ${zName} (Eje ${axisLabel})`, 'Zapata Aislada Central (Alta Carga)', '2.60 x 2.60 x 0.60 m', "f'c = 250 kg/cm²", "Parrilla Var. #5 (5/8'') @ 15cm A.S.", 'Diseñada para carga axial tributaria de 85 Toneladas (AISC / ACI 318).');
+                        } else {
+                            inspectElement(`Zapata ${zName} (Eje ${axisLabel})`, 'Zapata Aislada Perimetral', '2.20 x 2.20 x 0.50 m', "f'c = 250 kg/cm²", "Parrilla Var. #4 (1/2'') @ 15cm A.S.", 'Soporta columnas de fachada y viento según CORTEN/CFE.');
+                        }
+                    });
+                    gFootings.appendChild(footing);
+
+                    // Pedestal (60x60cm = 15x15px)
+                    const pSize = 0.6 * scale;
+                    const pedestal = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    pedestal.setAttribute('x', cx - pSize/2);
+                    pedestal.setAttribute('y', cy - pSize/2);
+                    pedestal.setAttribute('width', pSize);
+                    pedestal.setAttribute('height', pSize);
+                    pedestal.setAttribute('class', 'pedestal interactive-element');
+                    pedestal.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        inspectElement(`Pedestal P-1 (Eje ${axisLabel})`, 'Pedestal de Concreto Reforzado', '60 x 60 x 120 cm', "f'c = 250 kg/cm²", "8 Var. #6 (3/4'') + Estribos #3 @ 12cm", 'Transmite cargas del perfil metálico a la zapata mediante pernos de anclaje.');
+                    });
+                    gPedestals.appendChild(pedestal);
+
+                    // Placa Base (50x50cm) y Columna W14x90
+                    const plateSize = 0.5 * scale; // 12.5px
+                    const plate = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    plate.setAttribute('x', cx - plateSize/2);
+                    plate.setAttribute('y', cy - plateSize/2);
+                    plate.setAttribute('width', plateSize);
+                    plate.setAttribute('height', plateSize);
+                    plate.setAttribute('class', 'base-plate interactive-element');
+                    plate.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        inspectElement(`Placa Base PB-1 (Eje ${axisLabel})`, 'Placa de Asiento de Acero A36', '500 x 500 x 25 mm', 'Acero ASTM A36 / S275JR', "4 Pernos de Anclaje ASTM F1554 Grado 36 (3/4'' x 500mm)", 'Apretado con torquímetro e inyección de SikaGrout 212 de 40mm.');
+                    });
+                    gPlates.appendChild(plate);
+
+                    // Perfil I (Columna W14x90 simplificado)
+                    const colPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    // Perfil H dibujado
+                    colPath.setAttribute('d', `M ${cx-4} ${cy-5} h 8 v 2 h -3 v 6 h 3 v 2 h -8 v -2 h 3 v -6 h -3 z`);
+                    colPath.setAttribute('class', 'column-profile');
+                    gPlates.appendChild(colPath);
+
+                    // Pernos (4 puntos)
+                    const offset = 4.5;
+                    [[-offset, -offset], [offset, -offset], [-offset, offset], [offset, offset]].forEach(pt => {
+                        const bolt = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                        bolt.setAttribute('cx', cx + pt[0]);
+                        bolt.setAttribute('cy', cy + pt[1]);
+                        bolt.setAttribute('r', 0.8);
+                        bolt.setAttribute('class', 'anchor-bolt');
+                        gPlates.appendChild(bolt);
+                    });
+                }
+            }
+
+            // 4. EJES ESTRUCTURALES Y BORDES
+            // Horizontales (A, B, C)
+            axesY.forEach((label, j) => {
+                const y = j * spanY;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', -60);
+                line.setAttribute('y1', y);
+                line.setAttribute('x2', 40 * scale + 60);
+                line.setAttribute('y2', y);
+                gAxes.appendChild(line);
+
+                // Burbuja Izquierda
+                createAxisBubble(gAxes, -80, y, label);
+                // Burbuja Derecha
+                createAxisBubble(gAxes, 40 * scale + 80, y, label);
+            });
+
+            // Verticales (1, 2, 3, 4, 5)
+            axesX.forEach((label, i) => {
+                const x = i * spanX;
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x);
+                line.setAttribute('y1', -60);
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', 20 * scale + 60);
+                gAxes.appendChild(line);
+
+                // Burbuja Superior
+                createAxisBubble(gAxes, x, -80, label);
+                // Burbuja Inferior
+                createAxisBubble(gAxes, x, 20 * scale + 80, label);
+            });
+
+            // 5. COTAS
+            // Cota Horizontal Total (40m)
+            createDimension(gDims, 0, 20 * scale + 130, 40 * scale, 20 * scale + 130, '40.00 m (LONGITUD TOTAL)');
+            // Vanos horizontales (10m)
+            for(let i=0; i<4; i++) {
+                createDimension(gDims, i*spanX, -130, (i+1)*spanX, -130, '10.00 m');
+            }
+            // Cota Vertical Total (20m)
+            createDimension(gDims, -130, 0, -130, 20 * scale, '20.00 m', true);
+
+            // Inyectar capas al grupo principal
+            mainGroup.appendChild(gTieBeams);
+            mainGroup.appendChild(gWall);
+            mainGroup.appendChild(gFootings);
+            mainGroup.appendChild(gPedestals);
+            mainGroup.appendChild(gPlates);
+            mainGroup.appendChild(gAxes);
+            mainGroup.appendChild(gDims);
+        }
+
+        function createAxisBubble(group, cx, cy, label) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', cx);
+            circle.setAttribute('cy', cy);
+            circle.setAttribute('r', 16);
+            circle.setAttribute('class', 'axis-bubble');
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', cx);
+            text.setAttribute('y', cy);
+            text.setAttribute('class', 'axis-text');
+            text.textContent = label;
+
+            group.appendChild(circle);
+            group.appendChild(text);
+        }
+
+        function createDimension(group, x1, y1, x2, y2, textStr, isVertical = false) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', x1);
+            line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2);
+            line.setAttribute('y2', y2);
+            line.setAttribute('class', 'dim-line');
+
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('class', 'dim-text');
+
+            if(!isVertical) {
+                text.setAttribute('x', (x1 + x2) / 2);
+                text.setAttribute('y', y1 - 8);
+            } else {
+                text.setAttribute('x', x1 - 10);
+                text.setAttribute('y', (y1 + y2) / 2);
+                text.setAttribute('transform', `rotate(-90, ${x1 - 10}, ${(y1 + y2) / 2})`);
+            }
+            text.textContent = textStr;
+
+            group.appendChild(line);
+            group.appendChild(text);
+        }
+
+        // INSPECTOR DE ELEMENTOS
+        function inspectElement(title, subtitle, dims, concrete, steel, desc) {
+            inspectorTitle.innerText = title;
+            inspectorContent.innerHTML = `
+                <div class="prop-row"><span class="prop-label">Tipo:</span><span class="prop-value">${subtitle}</span></div>
+                <div class="prop-row"><span class="prop-label">Geometría:</span><span class="prop-value">${dims}</span></div>
+                <div class="prop-row"><span class="prop-label">Resistencia:</span><span class="prop-value">${concrete}</span></div>
+                <div class="prop-row"><span class="prop-label">Refuerzo/Acero:</span><span class="prop-value">${steel}</span></div>
+                <p style="margin-top:10px; color:#a0b8d0; line-height:1.4;">${desc}</p>
+                <div class="code-tag">CUMPLE: ACI 318-19 / AISC 360-16</div>
+            `;
+        }
+
+        // CONTROL DE CAPAS (TOGGLE)
+        document.getElementById('chk-axes').addEventListener('change', (e) => document.getElementById('layer-axes').style.display = e.target.checked ? 'block' : 'none');
+        document.getElementById('chk-footings').addEventListener('change', (e) => document.getElementById('layer-footings').style.display = e.target.checked ? 'block' : 'none');
+        document.getElementById('chk-pedestals').addEventListener('change', (e) => document.getElementById('layer-pedestals').style.display = e.target.checked ? 'block' : 'none');
+        document.getElementById('chk-tiebeams').addEventListener('change', (e) => document.getElementById('layer-tiebeams').style.display = e.target.checked ? 'block' : 'none');
+        document.getElementById('chk-wall').addEventListener('change', (e) => document.getElementById('layer-wall').style.display = e.target.checked ? 'block' : 'none');
+        document.getElementById('chk-plates').addEventListener('change', (e) => document.getElementById('layer-plates').style.display = e.target.checked ? 'block' : 'none');
+        document.getElementById('chk-dims').addEventListener('change', (e) => document.getElementById('layer-dims').style.display = e.target.checked ? 'block' : 'none');
+
+        // INTERACCIÓN ZOOM & PAN
+        function updateTransform() {
+            mainGroup.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoom})`);
+        }
+
+        viewport.addEventListener('mousedown', (e) => {
+            if(e.target.closest('.controls-panel') || e.target.closest('.inspector-panel')) return;
+            isDragging = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+                updateTransform();
+            }
+
+            // Coordenadas reales
+            const rect = svg.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left - panX) / (scale * zoom);
+            const mouseY = (e.clientY - rect.top - panY) / (scale * zoom);
+            coordsDisplay.textContent = `X: ${Math.max(0, mouseX).toFixed(2)}m | Y: ${Math.max(0, mouseY).toFixed(2)}m`;
+        });
+
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = 1.1;
+            if (e.deltaY < 0) {
+                zoom *= zoomFactor;
+            } else {
+                zoom /= zoomFactor;
+            }
+            zoom = Math.min(Math.max(0.4, zoom), 5); // Límites de zoom
+            updateTransform();
+        });
+
+        document.getElementById('btn-zoom-in').addEventListener('click', () => { zoom *= 1.2; updateTransform(); });
+        document.getElementById('btn-zoom-out').addEventListener('click', () => { zoom /= 1.2; updateTransform(); });
+        document.getElementById('btn-reset').addEventListener('click', () => { zoom = 1; panX = 180; panY = 100; updateTransform(); });
+
+        // Inicializar
+        initBlueprint();
+    </script>
+</body>
+</html>
