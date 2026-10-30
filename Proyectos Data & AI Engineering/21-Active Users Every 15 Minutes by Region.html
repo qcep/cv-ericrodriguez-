@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinPulse: Active Users Every 15 Minutes by Region</title>
+    
+    <!-- Fuentes e Iconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Three.js + GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #050914;
+            --panel: #0d1424;
+            --panel-2: #1a2236;
+            --text: #f3f4f6;
+            --muted: #94a3b8;
+            --cyan: #00f2fe;
+            --purple: #b224ef;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #fbbf24;
+            --orange: #f97316;
+            --pink: #ec4899;
+            --border: rgba(255,255,255,0.08);
+            --glass: rgba(13, 20, 36, 0.75);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* FONDO 3D */
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* BARRA DE PROGRESO */
+        #progress-bar {
+            position: fixed;
+            top: 0; left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--orange));
+            width: 0%;
+            z-index: 1000;
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        /* NAV DOTS */
+        .nav-dots {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .nav-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .nav-dot:hover, .nav-dot.active {
+            background: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan);
+            transform: scale(1.3);
+        }
+        .nav-dot::after {
+            content: attr(data-label);
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--panel);
+            color: var(--text);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            border: 1px solid var(--border);
+        }
+        .nav-dot:hover::after { opacity: 1; }
+
+        /* HERO */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 50px;
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--cyan);
+            font-size: 0.8rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5.5vw, 4.5rem);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: -2px;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #ffffff 0%, var(--cyan) 50%, var(--purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            max-width: 1100px;
+        }
+
+        .hero p.lead {
+            font-size: 1.15rem;
+            color: var(--muted);
+            max-width: 720px;
+            margin-bottom: 40px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .hero-stat { text-align: center; }
+        .hero-stat .val {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .hero-stat .lbl {
+            font-size: 0.75rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: 30px;
+            font-size: 0.85rem;
+            color: var(--cyan);
+            animation: bounce 2s infinite;
+            letter-spacing: 2px;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(-15px); opacity: 0.5; }
+        }
+
+        /* CONTENEDOR PRINCIPAL */
+        .main {
+            position: relative;
+            z-index: 1;
+            max-width: 1250px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        /* SECCIONES */
+        .section {
+            margin: 120px 0;
+            opacity: 0;
+            transform: translateY(60px);
+        }
+
+        .section-num {
+            font-size: 5rem;
+            font-weight: 900;
+            color: rgba(255,255,255,0.05);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: -30px;
+        }
+
+        .section-header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 25px;
+        }
+
+        .section-tag {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .tag-cyan { background: rgba(0,242,254,0.1); color: var(--cyan); border: 1px solid rgba(0,242,254,0.3); }
+        .tag-purple { background: rgba(178,36,239,0.1); color: var(--purple); border: 1px solid rgba(178,36,239,0.3); }
+        .tag-orange { background: rgba(249,115,22,0.1); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+        .tag-green { background: rgba(16,185,129,0.1); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+        .tag-red { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+        .tag-yellow { background: rgba(251,191,36,0.1); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+
+        .section h2 {
+            font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 15px;
+            letter-spacing: -1px;
+        }
+
+        .section .intro {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 900px;
+        }
+
+        /* GLASS CARDS */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 35px;
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(0, 242, 254, 0.3);
+        }
+
+        .glass-card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .glass-card h3 .icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .icon-cyan { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .icon-purple { background: rgba(178,36,239,0.15); color: var(--purple); }
+        .icon-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        .icon-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .icon-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
+        .icon-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+
+        .glass-card h4 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin: 20px 0 10px;
+            color: var(--cyan);
+        }
+
+        .glass-card p { color: var(--muted); margin-bottom: 12px; }
+        .glass-card ul { color: var(--muted); padding-left: 20px; margin-bottom: 15px; }
+        .glass-card ul li { margin-bottom: 6px; }
+        .glass-card strong { color: var(--text); }
+
+        /* GRID */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+        /* TABLAS */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead { background: rgba(0, 242, 254, 0.05); }
+
+        th {
+            text-align: left;
+            padding: 15px;
+            color: var(--cyan);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        tbody tr:hover { background: rgba(0, 242, 254, 0.03); }
+        tbody tr:last-child td { border-bottom: none; }
+        td strong { color: var(--text); font-family: 'Outfit', sans-serif; }
+        td .price { color: var(--green); font-weight: 700; }
+        td .price-red { color: var(--red); font-weight: 700; }
+        td .price-yellow { color: var(--yellow); font-weight: 700; }
+
+        /* CODE BLOCK */
+        .code-block {
+            background: #000814;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+            line-height: 1.7;
+        }
+
+        .code-block .comment { color: #6a9955; }
+        .code-block .cmd { color: var(--cyan); }
+        .code-block .arg { color: var(--yellow); }
+        .code-block .val { color: var(--purple); }
+        .code-block .num { color: var(--orange); }
+        .code-block .keyword { color: #c586c0; }
+        .code-block .string { color: #ce9178; }
+        .code-block .func { color: #dcdcaa; }
+        .code-block .var { color: #9cdcfe; }
+
+        /* CALLOUTS */
+        .callout {
+            display: flex;
+            gap: 15px;
+            padding: 20px;
+            border-radius: 14px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        .callout.info { background: rgba(0, 242, 254, 0.05); border-color: var(--cyan); }
+        .callout.warn { background: rgba(251, 191, 36, 0.05); border-color: var(--yellow); }
+        .callout.danger { background: rgba(239, 68, 68, 0.05); border-color: var(--red); }
+        .callout.success { background: rgba(16, 185, 129, 0.05); border-color: var(--green); }
+        .callout .callout-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+        .callout.info .callout-icon { color: var(--cyan); }
+        .callout.warn .callout-icon { color: var(--yellow); }
+        .callout.danger .callout-icon { color: var(--red); }
+        .callout.success .callout-icon { color: var(--green); }
+        .callout-content { flex: 1; }
+        .callout-content strong { color: var(--text); display: block; margin-bottom: 5px; }
+        .callout-content p { color: var(--muted); font-size: 0.95rem; margin: 0; }
+
+        /* TIMELINE */
+        .timeline { position: relative; padding-left: 40px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--cyan), var(--purple), transparent);
+        }
+
+        .timeline-item { position: relative; margin-bottom: 30px; }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -32px;
+            top: 5px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 2px solid var(--cyan);
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        .timeline-item h4 { color: var(--cyan); font-size: 1rem; margin-bottom: 8px; }
+        .timeline-item p { color: var(--muted); font-size: 0.92rem; }
+
+        /* METRIC CARDS */
+        .metric-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .metric-card:hover {
+            border-color: var(--cyan);
+            transform: translateY(-5px);
+        }
+        .metric-card .metric-label {
+            font-size: 0.72rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .metric-card .metric-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .metric-card .metric-sub { font-size: 0.8rem; color: var(--muted); }
+        .val-cyan { color: var(--cyan); }
+        .val-green { color: var(--green); }
+        .val-red { color: var(--red); }
+        .val-yellow { color: var(--yellow); }
+        .val-purple { color: var(--purple); }
+
+        /* COMPARATIVA */
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .compare-box { border-radius: 16px; padding: 25px; border: 1px solid; }
+        .compare-box.bad { background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.3); }
+        .compare-box.good { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.3); }
+        .compare-box h4 { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-size: 1.1rem; }
+        .compare-box.bad h4 { color: var(--red); }
+        .compare-box.good h4 { color: var(--green); }
+
+        /* BAR CHART */
+        .bar-chart { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .bar-row { display: flex; align-items: center; gap: 15px; }
+        .bar-label {
+            min-width: 180px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .bar-track {
+            flex: 1;
+            height: 30px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #000;
+            font-family: 'JetBrains Mono', monospace;
+            transition: width 1.5s ease;
+        }
+        .bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #00b8cc); }
+        .bar-fill.purple { background: linear-gradient(90deg, var(--purple), #8a1bc4); color: #fff; }
+        .bar-fill.green { background: linear-gradient(90deg, var(--green), #059669); }
+        .bar-fill.red { background: linear-gradient(90deg, var(--red), #b91c1c); color: #fff; }
+        .bar-fill.yellow { background: linear-gradient(90deg, var(--yellow), #d97706); }
+
+        /* PILL / BADGE */
+        .pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pill-cyan { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .pill-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        .pill-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .pill-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+        .pill-purple { background: rgba(178,36,239,0.15); color: var(--purple); }
+
+        /* TOC */
+        .toc {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 60px 0;
+        }
+        .toc h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--cyan);
+            margin-bottom: 20px;
+        }
+        .toc ol {
+            list-style: none;
+            counter-reset: toc-counter;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .toc ol li {
+            counter-increment: toc-counter;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .toc ol li::before {
+            content: counter(toc-counter, decimal-leading-zero);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+            background: rgba(0,242,254,0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,242,254,0.2);
+        }
+        .toc ol li a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+        .toc ol li:hover a { color: var(--cyan); }
+
+        /* TOPOLOGY DIAGRAM */
+        .topology {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 30px 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .topo-node {
+            flex: 1;
+            min-width: 130px;
+            text-align: center;
+            padding: 16px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            background: var(--panel-2);
+            position: relative;
+        }
+        .topo-node.source { border-color: var(--green); color: #86efac; background: rgba(16,185,129,0.1); }
+        .topo-node.transform { border-color: var(--cyan); color: #93c5fd; background: rgba(0,242,254,0.1); }
+        .topo-node.agg { border-color: var(--purple); color: #c4b5fd; background: rgba(178,36,239,0.1); }
+        .topo-node.sink { border-color: var(--orange); color: #fdba74; background: rgba(249,115,22,0.1); }
+        .topo-node .sub {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: normal;
+            color: var(--muted);
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .topo-arrow {
+            color: var(--cyan);
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        /* SAMPLE OUTPUT BLOCK */
+        .sample-output {
+            background: #000;
+            border: 1px solid var(--green);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: #86efac;
+            margin: 15px 0;
+            white-space: pre-wrap;
+        }
+        .sample-output .label {
+            color: var(--muted);
+            display: block;
+            margin-bottom: 8px;
+            border-bottom: 1px solid rgba(16,185,129,0.2);
+            padding-bottom: 6px;
+        }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 80px 20px 40px;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            margin-top: 120px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+            .grid-2, .grid-3, .grid-4, .compare-grid, .toc ol {
+                grid-template-columns: 1fr;
+            }
+            .nav-dots { display: none; }
+            .hero-stats { gap: 20px; }
+            .hero-stat .val { font-size: 1.6rem; }
+            .section { margin: 80px 0; }
+            .glass-card { padding: 25px; }
+            .bar-label { min-width: 120px; font-size: 0.75rem; }
+            .topology { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE PROGRESO -->
+    <div id="progress-bar"></div>
+
+    <!-- NAV DOTS -->
+    <div class="nav-dots">
+        <div class="nav-dot" data-label="Hero" data-target="hero"></div>
+        <div class="nav-dot" data-label="Contexto" data-target="contexto"></div>
+        <div class="nav-dot" data-label="Setup" data-target="setup"></div>
+        <div class="nav-dot" data-label="Schema" data-target="schema"></div>
+        <div class="nav-dot" data-label="Ventanas" data-target="ventanas"></div>
+        <div class="nav-dot" data-label="Sinks" data-target="sinks"></div>
+        <div class="nav-dot" data-label="Validación" data-target="validacion"></div>
+    </div>
+
+    <!-- FONDO 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- HERO -->
+    <section class="hero" id="hero">
+        <div class="hero-badge">Project Fin</div>
+        <h1>Active Users Every 15 Minutes by Region</h1>
+        <p class="lead">
+            FinPulse — Construir una métrica de "usuarios activos únicos cada 15 minutos por región" usando Spark Structured Streaming, event-time windows, watermarks y Delta Lake, con garantías de correctness y continuidad.
+        </p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <div class="val">15 min</div>
+                <div class="lbl">Tumbling window</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">20 min</div>
+                <div class="lbl">Watermark</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">approx_count_distinct</div>
+                <div class="lbl">Unique users</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">Kafka / File</div>
+                <div class="lbl">Source dual</div>
+            </div>
+        </div>
+        <div class="scroll-hint">Desliza para explorar ↓</div>
+    </section>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- TOC -->
+        <div class="toc">
+            <h3><i class="fa-solid fa-list-check"></i> Contenido del Proyecto</h3>
+            <ol>
+                <li><a href="#contexto">Contexto: FinPulse y la métrica</a></li>
+                <li><a href="#setup">Setup: Unity Catalog Volume</a></li>
+                <li><a href="#schema">Schema y Source (Kafka/File)</a></li>
+                <li><a href="#ventanas">15-min windows + watermark + unique users</a></li>
+                <li><a href="#sinks">Sinks: Console y Delta</a></li>
+                <li><a href="#validacion">Validación y troubleshooting</a></li>
+            </ol>
+        </div>
+
+        <!-- =========================================
+             SECCIÓN 1: CONTEXTO
+             ========================================= -->
+        <section class="section" id="contexto">
+            <div class="section-num">01</div>
+            <div class="section-header">
+                <span class="section-tag tag-cyan">Contexto</span>
+                <h2>FinPulse: La Métrica de Usuarios Activos</h2>
+                <p class="intro">
+                    El liderazgo de FinPulse requiere una métrica confiable de dashboards: <strong>usuarios activos únicos cada 15 minutos, desglosados por región</strong>. Este proyecto construye esa métrica con garantías de event-time correctness.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-bullseye"></i></span> Objetivos del Proyecto</h3>
+                <ul>
+                    <li>Conectar a Kafka para un stream real.</li>
+                    <li>Parsear eventos en columnas tipadas con schema explícito.</li>
+                    <li>Computar una <strong>ventana tumbling de 15 minutos por región</strong> para contar usuarios únicos.</li>
+                    <li>Aplicar un <strong>watermark</strong> para incluir eventos ligeramente tardíos y descartar los muy tardíos de forma segura.</li>
+                    <li>Escribir resultados a <strong>Delta Lake</strong> con checkpointing para confiabilidad y continuidad.</li>
+                </ul>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-database"></i></span> Esquema de Datos</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>user_id</strong></td>
+                                <td><code>string</code></td>
+                                <td>Identificador del usuario (ej: U-00001)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>event_time</strong></td>
+                                <td><code>timestamp</code></td>
+                                <td>Cuándo ocurrió el evento (business time)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>region</strong></td>
+                                <td><code>string</code></td>
+                                <td>NA, EU, APAC, LATAM</td>
+                            </tr>
+                            <tr>
+                                <td><strong>action</strong></td>
+                                <td><code>string</code></td>
+                                <td>login, view, purchase</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-route"></i></span> Topología del Pipeline</h3>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-satellite-dish"></i> Kafka / File
+                        <span class="sub">events_df</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-clock"></i> withWatermark
+                        <span class="sub">20 minutes</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-window-restore"></i> window(15 min)
+                        <span class="sub">groupBy region</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-users"></i> approx_count_distinct
+                        <span class="sub">unique_users</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-database"></i> Delta
+                        <span class="sub">delta_active_users</span>
+                    </div>
+                </div>
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-circle-info"></i></div>
+                    <div class="callout-content">
+                        <strong>Dual source</strong>
+                        <p>El notebook soporta <strong>Kafka real</strong> (format("kafka") → cast value → from_json) o <strong>file simulator</strong> (readStream.json con schema y badRecordsPath). El flag <code>USE_FILE_SIM</code> controla cuál se usa.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 2: SETUP
+             ========================================= -->
+        <section class="section" id="setup">
+            <div class="section-num">02</div>
+            <div class="section-header">
+                <span class="section-tag tag-green">Activity 1</span>
+                <h2>Configurar Unity Catalog Volume</h2>
+                <p class="intro">
+                    En Databricks Free, todo debe vivir bajo un UC Volume. Configuramos catálogo, schema y volume, más las carpetas de trabajo.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-folder-tree"></i></span> Estructura de Carpetas</h3>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-folder"></i> finpulse
+                        <span class="sub">base_path</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-inbox"></i> inbox
+                        <span class="sub">JSON events</span>
+                    </div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-triangle-exclamation"></i> _bad
+                        <span class="sub">malformed</span>
+                    </div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-save"></i> _chk
+                        <span class="sub">checkpoints</span>
+                    </div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-database"></i> delta_active_users
+                        <span class="sub">KPI table</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-code"></i></span> Código de Setup</h3>
+                <div class="code-block">
+<span class="comment"># 0) Imports & Spark</span><br>
+<span class="keyword">from</span> pyspark.sql <span class="keyword">import</span> SparkSession<br>
+<span class="keyword">from</span> pyspark.sql.types <span class="keyword">import</span> StructType, StructField, StringType, TimestampType<br>
+<span class="keyword">from</span> pyspark.sql.functions <span class="keyword">import</span> col, from_json, window, approx_count_distinct<br>
+spark = SparkSession.builder.getOrCreate()<br><br>
+
+<span class="comment"># Configuración UC</span><br>
+CATALOG = <span class="string">"demo_cat"</span><br>
+SCHEMA  = <span class="string">"streams"</span><br>
+VOLUME  = <span class="string">"landing"</span><br><br>
+
+<span class="comment"># Crear UC objects si no existen</span><br>
+<span class="keyword">try</span>:<br>
+&nbsp;&nbsp;spark.sql(<span class="string">f"CREATE CATALOG IF NOT EXISTS {CATALOG}"</span>)<br>
+&nbsp;&nbsp;spark.sql(<span class="string">f"CREATE SCHEMA  IF NOT EXISTS {CATALOG}.{SCHEMA}"</span>)<br>
+&nbsp;&nbsp;spark.sql(<span class="string">f"CREATE VOLUME  IF NOT EXISTS {CATALOG}.{SCHEMA}.{VOLUME}"</span>)<br>
+&nbsp;&nbsp;print(<span class="string">"UC volume is ready."</span>)<br>
+<span class="keyword">except</span> Exception <span class="keyword">as</span> e:<br>
+&nbsp;&nbsp;print(<span class="string">"Warning: Could not create UC objects."</span>, e)<br><br>
+
+<span class="comment"># Paths base</span><br>
+base_path       = <span class="string">f"dbfs:/Volumes/{CATALOG}/{SCHEMA}/{VOLUME}/finpulse"</span><br>
+inbox_path      = <span class="string">f"{base_path}/inbox"</span><br>
+bad_path        = <span class="string">f"{base_path}/_bad"</span><br>
+checkpoint_root = <span class="string">f"{base_path}/_chk"</span><br>
+delta_out_path  = <span class="string">f"{base_path}/delta_active_users"</span><br><br>
+
+<span class="keyword">for</span> p <span class="keyword">in</span> [base_path, inbox_path, bad_path, checkpoint_root, delta_out_path]:<br>
+&nbsp;&nbsp;dbutils.fs.mkdirs(p)
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-wand-magic-sparkles"></i></span> Generador de Eventos (Fallback)</h3>
+                <p>Simula actividad de usuarios con <code>late_ratio</code> para probar watermarks:</p>
+                <div class="code-block">
+<span class="keyword">import</span> json, time, uuid, random<br>
+<span class="keyword">from</span> datetime <span class="keyword">import</span> datetime, timedelta<br><br>
+
+regions = [<span class="string">"NA"</span>,<span class="string">"EU"</span>,<span class="string">"APAC"</span>,<span class="string">"LATAM"</span>]<br>
+actions = [<span class="string">"login"</span>,<span class="string">"view"</span>,<span class="string">"purchase"</span>]<br><br>
+
+<span class="keyword">def</span> <span class="func">generate_user_activity_wave</span>(n_files=<span class="num">2</span>, rows_per_file=<span class="num">80</span>, late_ratio=<span class="num">0.2</span>):<br>
+&nbsp;&nbsp;<span class="keyword">for</span> _ <span class="keyword">in</span> range(n_files):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path = <span class="string">f"{inbox_path}/batch_{int(time.time())}_{uuid.uuid4().hex}.json"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;lines = []<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">for</span> r <span class="keyword">in</span> range(rows_per_file):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;now = datetime.utcnow()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> random.random() &lt; late_ratio:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;et = now - timedelta(minutes=random.randint(<span class="num">1</span>,<span class="num">10</span>))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">else</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;et = now<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;evt = {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"user_id"</span>: <span class="string">f"U-{random.randint(1, 5000):05d}"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"event_time"</span>: et.strftime(<span class="string">"%Y-%m-%dT%H:%M:%S.%fZ"</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"region"</span>: random.choice(regions),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"action"</span>: random.choice(actions)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lines.append(json.dumps(evt))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dbutils.fs.put(path, <span class="string">"\n"</span>.join(lines), overwrite=<span class="keyword">True</span>)
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 3: SCHEMA
+             ========================================= -->
+        <section class="section" id="schema">
+            <div class="section-num">03</div>
+            <div class="section-header">
+                <span class="section-tag tag-purple">Activity 2</span>
+                <h2>Schema y Source (Kafka o File)</h2>
+                <p class="intro">
+                    Un schema estricto garantiza parsing estable y métricas confiables. El source puede ser Kafka real o el simulador de archivos.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-table-columns"></i></span> Challenge 1: Definir Schema</h3>
+                <div class="code-block">
+activity_schema = StructType([<br>
+&nbsp;&nbsp;StructField(<span class="string">"user_id"</span>,    StringType(),   <span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"event_time"</span>, TimestampType(),<span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"region"</span>,     StringType(),   <span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"action"</span>,     StringType(),   <span class="keyword">True</span>),<br>
+])
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-plug"></i></span> Challenge 2: Streaming Source</h3>
+                
+                <h4>Path Kafka</h4>
+                <div class="code-block">
+raw = (spark.readStream<br>
+&nbsp;&nbsp;.format(<span class="string">"kafka"</span>)<br>
+&nbsp;&nbsp;.option(<span class="string">"kafka.bootstrap.servers"</span>, KAFKA_BOOTSTRAP_SERVERS)<br>
+&nbsp;&nbsp;.option(<span class="string">"subscribe"</span>, KAFKA_TOPIC)<br>
+&nbsp;&nbsp;.option(<span class="string">"startingOffsets"</span>, <span class="string">"latest"</span>)<br>
+&nbsp;&nbsp;.load())<br><br>
+parsed = raw.selectExpr(<span class="string">"CAST(value AS STRING) AS vstr"</span>)<br>
+events_df = parsed.select(<br>
+&nbsp;&nbsp;from_json(col(<span class="string">"vstr"</span>), activity_schema).alias(<span class="string">"d"</span>)<br>
+).select(<span class="string">"d.*"</span>)
+                </div>
+
+                <h4>Path File Simulator</h4>
+                <div class="code-block">
+events_df = (spark.readStream<br>
+&nbsp;&nbsp;.schema(activity_schema)<br>
+&nbsp;&nbsp;.option(<span class="string">"badRecordsPath"</span>, bad_path)<br>
+&nbsp;&nbsp;.option(<span class="string">"maxFilesPerTrigger"</span>, <span class="num">1</span>)<br>
+&nbsp;&nbsp;.json(inbox_path))
+                </div>
+
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-lightbulb"></i></div>
+                    <div class="callout-content">
+                        <strong>Flag USE_FILE_SIM</strong>
+                        <p>Controla cuál path se usa. En Databricks Free o sin Kafka disponible, usar file simulator con <code>late_ratio=0.2</code> para simular eventos tardíos.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 4: VENTANAS
+             ========================================= -->
+        <section class="section" id="ventanas">
+            <div class="section-num">04</div>
+            <div class="section-header">
+                <span class="section-tag tag-orange">Activity 3</span>
+                <h2>15-min Windows + Watermark + Unique Users</h2>
+                <p class="intro">
+                    La combinación de tumbling window de 15 minutos con watermark de 20 minutos garantiza que las métricas de usuarios activos sean event-time accurate y bounded en estado.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-window-restore"></i></span> Challenge 3: Aggregation</h3>
+                <div class="code-block">
+agg_df = (events_df<br>
+&nbsp;&nbsp;.withWatermark(<span class="string">"event_time"</span>, <span class="string">"20 minutes"</span>)<br>
+&nbsp;&nbsp;.groupBy(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;window(col(<span class="string">"event_time"</span>), <span class="string">"15 minutes"</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;col(<span class="string">"region"</span>)<br>
+&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;.agg(approx_count_distinct(<span class="string">"user_id"</span>).alias(<span class="string">"unique_users"</span>))<br>
+)
+                </div>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-file"></i> events_df
+                        <span class="sub">event_time</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-clock"></i> withWatermark
+                        <span class="sub">20 min</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-window-restore"></i> window(15 min)
+                        <span class="sub">tumbling</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-users"></i> groupBy region
+                        <span class="sub">+ approx_count_distinct</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-table"></i> agg_df
+                        <span class="sub">window, region, unique_users</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-microscope"></i></span> Decisiones Técnicas</h3>
+                
+                <h4>¿Por qué 15 minutos?</h4>
+                <ul>
+                    <li>Granularidad suficiente para detectar tendencias sin ruido excesivo.</li>
+                    <li>Balance entre frescura y costo de cómputo.</li>
+                    <li>Compatible con dashboards ejecutivos.</li>
+                </ul>
+
+                <h4>¿Por qué watermark de 20 minutos?</h4>
+                <ul>
+                    <li><strong>Mayor que la ventana (15 min)</strong>: permite finalizar ventanas correctamente.</li>
+                    <li><strong>Captura eventos tardíos</strong>: el generador simula hasta 10 min de latencia.</li>
+                    <li><strong>Bounded state</strong>: descarta eventos más viejos sin crecer indefinidamente.</li>
+                </ul>
+
+                <h4>¿Por qué approx_count_distinct?</h4>
+                <ul>
+                    <li><strong>Streaming-friendly</strong>: no requiere mantener todos los user_ids en memoria.</li>
+                    <li><strong>Eficiente</strong>: usa HyperLogLog con error ~2%.</li>
+                    <li><strong>Suficiente para BI</strong>: dashboards no necesitan exactitud perfecta en unique counts.</li>
+                </ul>
+
+                <div class="callout warn">
+                    <div class="callout-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="callout-content">
+                        <strong>Watermark < ventana = problema</strong>
+                        <p>Si el watermark fuera menor que la ventana (ej: 10 min con ventana de 15 min), las ventanas podrían finalizar antes de recibir todos los eventos, perdiendo datos válidos.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 5: SINKS
+             ========================================= -->
+        <section class="section" id="sinks">
+            <div class="section-num">05</div>
+            <div class="section-header">
+                <span class="section-tag tag-green">Activities 4-5</span>
+                <h2>Sinks: Console y Delta</h2>
+                <p class="intro">
+                    Dos sinks con <code>outputMode("append")</code> y checkpoints independientes. Console para preview, Delta para serving layer del dashboard.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-terminal"></i></span> Challenge 4: Console Sink</h3>
+                <div class="code-block">
+q_console = (agg_df.writeStream<br>
+&nbsp;&nbsp;.format(<span class="string">"console"</span>)<br>
+&nbsp;&nbsp;.outputMode(<span class="string">"append"</span>)<br>
+&nbsp;&nbsp;.option(<span class="string">"truncate"</span>, <span class="string">"false"</span>)<br>
+&nbsp;&nbsp;.option(<span class="string">"numRows"</span>, <span class="num">100</span>)<br>
+&nbsp;&nbsp;.option(<span class="string">"checkpointLocation"</span>, <span class="string">f"{checkpoint_root}/console"</span>)<br>
+&nbsp;&nbsp;.trigger(availableNow=<span class="keyword">True</span>)<br>
+&nbsp;&nbsp;.start())<br>
+q_console.awaitTermination()
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-database"></i></span> Challenge 5: Delta Sink</h3>
+                <div class="code-block">
+q_delta = (agg_df.writeStream<br>
+&nbsp;&nbsp;.format(<span class="string">"delta"</span>)<br>
+&nbsp;&nbsp;.outputMode(<span class="string">"append"</span>)<br>
+&nbsp;&nbsp;.option(<span class="string">"checkpointLocation"</span>, <span class="string">f"{checkpoint_root}/delta"</span>)<br>
+&nbsp;&nbsp;.trigger(availableNow=<span class="keyword">True</span>)<br>
+&nbsp;&nbsp;.start(delta_out_path))<br>
+q_delta.awaitTermination()
+                </div>
+                <div class="callout success">
+                    <div class="callout-icon"><i class="fa-solid fa-check-circle"></i></div>
+                    <div class="callout-content">
+                        <strong>Append mode + watermark = ventanas finalizadas</strong>
+                        <p>Con append mode, Spark solo emite ventanas que han pasado el watermark. Cada ventana se emite una vez y nunca se actualiza — exactamente lo que BI necesita.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-eye"></i></span> Output Esperado</h3>
+                <div class="sample-output">
+<span class="label">Delta table: delta_active_users</span>
++------------------------------------------+------+-------------+
+|window                                    |region|unique_users |
++------------------------------------------+------+-------------+
+|{2025-01-15 14:00:00, 2025-01-15 14:15:00}|NA    |1247         |
+|{2025-01-15 14:00:00, 2025-01-15 14:15:00}|EU    |892          |
+|{2025-01-15 14:00:00, 2025-01-15 14:15:00}|APAC  |634          |
+|{2025-01-15 14:00:00, 2025-01-15 14:15:00}|LATAM |218          |
+|{2025-01-15 14:15:00, 2025-01-15 14:30:00}|NA    |1356         |
+|{2025-01-15 14:15:00, 2025-01-15 14:30:00}|EU    |921          |
++------------------------------------------+------+-------------+
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 6: VALIDACIÓN
+             ========================================= -->
+        <section class="section" id="validacion">
+            <div class="section-num">06</div>
+            <div class="section-header">
+                <span class="section-tag tag-red">Troubleshooting</span>
+                <h2>Validación y Problemas Comunes</h2>
+                <p class="intro">
+                    Checklist de éxito y soluciones a issues frecuentes en Databricks Free Edition.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-check-double"></i></span> Success Checklist</h3>
+                <ul>
+                    <li>Volume creado/validado y carpetas bajo <code>&lt;volume&gt;/finpulse</code>.</li>
+                    <li>Streaming source construido (Kafka o file) con schema explícito.</li>
+                    <li>15-min event-time window + watermark aplicados.</li>
+                    <li>Aggregates persistidos a Delta con checkpointing.</li>
+                    <li>Re-runs con availableNow procesan nuevas waves sin duplicados.</li>
+                </ul>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-red"><i class="fa-solid fa-bug"></i></span> Common Issues & Solutions</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Problema</th>
+                                <th>Causa</th>
+                                <th>Solución</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Delta read error (_delta_log missing)</strong></td>
+                                <td>Delta sink no ha corrido aún</td>
+                                <td>Ejecutar el Delta sink al menos una vez (usar la celda de safe validation)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>No console output</strong></td>
+                                <td>Sin archivos/mensajes antes de availableNow</td>
+                                <td>Generar archivos (o producir Kafka messages) primero</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Permission error creating Volume</strong></td>
+                                <td>Sin privilegios UC</td>
+                                <td>Pedir a un admin, o usar un Volume existente</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Duplicates</strong></td>
+                                <td>Checkpoint paths cambiados</td>
+                                <td>Mantener checkpoint paths estables entre runs</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-lightbulb"></i></span> Principios Clave</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <h4>1. Event time es la verdad del negocio</h4>
+                        <p>Window sobre <code>event_time</code>, no sobre cuándo Spark vio el evento.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>2. Watermark > ventana</h4>
+                        <p>20 min de watermark para 15 min de ventana permite capturar latencia y finalizar correctamente.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>3. approx_count_distinct para unique counts</h4>
+                        <p>Streaming-friendly, eficiente, error ~2% aceptable para BI.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>4. availableNow + checkpoints</h4>
+                        <p>Combinación clave para idempotencia en Databricks Free.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>5. Correctness + reliability son no negociables</h4>
+                        <p>Dashboards ejecutivos requieren métricas estables, no solo rápidas.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p style="font-size: 1rem; color: var(--text); margin-bottom: 10px;">
+            <i class="fa-solid fa-flask"></i> HOL: Active Users Every 15 Minutes by Region
+        </p>
+        <p style="font-size: 0.85rem;">FinPulse · Spark Structured Streaming · Event-time Windows · Watermarks · Delta Lake</p>
+        <p style="font-size: 0.75rem; margin-top: 15px; color: rgba(148,163,184,0.5);">
+            Proyecto FinPulse
+        </p>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script>
+        // THREE.JS BACKGROUND
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050914, 0.0025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 15, 90);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const pointLight = new THREE.PointLight(0x00f2fe, 2, 500);
+        scene.add(pointLight);
+        scene.add(new THREE.AmbientLight(0x222222));
+        const fillLight = new THREE.PointLight(0xb224ef, 1, 500);
+        fillLight.position.set(-50, -50, -50);
+        scene.add(fillLight);
+
+        const planetGeo = new THREE.IcosahedronGeometry(12, 32);
+        const planetMat = new THREE.MeshPhongMaterial({
+            color: 0x0a0a1a, emissive: 0x00f2fe, emissiveIntensity: 0.4,
+            wireframe: true, transparent: true, opacity: 0.7
+        });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        scene.add(planet);
+
+        const coreGeo = new THREE.IcosahedronGeometry(11.5, 16);
+        const coreMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.3, metalness: 0.8 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(core);
+
+        const ringGeo = new THREE.TorusGeometry(20, 0.08, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.25 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        scene.add(ring);
+
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesCount = 2500;
+        const posArray = new Float32Array(particlesCount * 3);
+        for (let i = 0; i < particlesCount * 3; i += 3) {
+            const r = 30 + Math.random() * 140;
+            const t = Math.random() * Math.PI * 2;
+            const p = Math.acos((Math.random() * 2) - 1);
+            posArray[i] = r * Math.sin(p) * Math.cos(t);
+            posArray[i+1] = r * Math.sin(p) * Math.sin(t);
+            posArray[i+2] = r * Math.cos(p);
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.7, color: 0x00f2fe, transparent: true, opacity: 0.5,
+            blending: THREE.AdditiveBlending
+        });
+        const particlesMesh = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particlesMesh);
+
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+            planet.rotation.y += 0.0015;
+            core.rotation.y -= 0.0008;
+            ring.rotation.z += 0.004;
+            particlesMesh.rotation.y = t * 0.03;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // GSAP
+        gsap.registerPlugin(ScrollTrigger);
+
+        gsap.utils.toArray('.section').forEach(section => {
+            gsap.to(section, {
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 85%",
+                    toggleActions: "play none none none"
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1.2,
+                ease: "power3.out"
+            });
+        });
+
+        gsap.to(".hero h1", {
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: true
+            },
+            scale: 0.85,
+            opacity: 0,
+            y: 80
+        });
+
+        gsap.utils.toArray('.bar-fill').forEach(bar => {
+            const finalWidth = bar.style.width;
+            bar.style.width = '0%';
+            gsap.to(bar, {
+                scrollTrigger: {
+                    trigger: bar,
+                    start: "top 90%"
+                },
+                width: finalWidth,
+                duration: 1.5,
+                ease: "power2.out"
+            });
+        });
+
+        // PROGRESS BAR
+        const progressBar = document.getElementById('progress-bar');
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            progressBar.style.width = scrollPercent + '%';
+        });
+
+        // NAV DOTS
+        const dots = document.querySelectorAll('.nav-dot');
+        const sections = document.querySelectorAll('section[id]');
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const target = document.getElementById(dot.dataset.target);
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        const observerOptions = {
+            root: null,
+            rootMargin: '-40% 0px -55% 0px',
+            threshold: 0
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    dots.forEach(d => {
+                        d.classList.toggle('active', d.dataset.target === id);
+                    });
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => observer.observe(section));
+
+        // SMOOTH SCROLL TOC
+        document.querySelectorAll('.toc ol li a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop - 40,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

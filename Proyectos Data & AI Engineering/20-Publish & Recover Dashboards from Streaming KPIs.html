@@ -1,0 +1,1495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopLive Lab 3: Publish & Recover Dashboards from Streaming KPIs</title>
+    
+    <!-- Fuentes e Iconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Three.js + GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #050914;
+            --panel: #0d1424;
+            --panel-2: #1a2236;
+            --text: #f3f4f6;
+            --muted: #94a3b8;
+            --cyan: #00f2fe;
+            --purple: #b224ef;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #fbbf24;
+            --orange: #f97316;
+            --pink: #ec4899;
+            --border: rgba(255,255,255,0.08);
+            --glass: rgba(13, 20, 36, 0.75);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* FONDO 3D */
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* BARRA DE PROGRESO */
+        #progress-bar {
+            position: fixed;
+            top: 0; left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--orange));
+            width: 0%;
+            z-index: 1000;
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        /* NAV DOTS */
+        .nav-dots {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .nav-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .nav-dot:hover, .nav-dot.active {
+            background: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan);
+            transform: scale(1.3);
+        }
+        .nav-dot::after {
+            content: attr(data-label);
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--panel);
+            color: var(--text);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            border: 1px solid var(--border);
+        }
+        .nav-dot:hover::after { opacity: 1; }
+
+        /* HERO */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 50px;
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--cyan);
+            font-size: 0.8rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5.5vw, 4.5rem);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: -2px;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #ffffff 0%, var(--cyan) 50%, var(--purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            max-width: 1100px;
+        }
+
+        .hero p.lead {
+            font-size: 1.15rem;
+            color: var(--muted);
+            max-width: 720px;
+            margin-bottom: 40px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .hero-stat { text-align: center; }
+        .hero-stat .val {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .hero-stat .lbl {
+            font-size: 0.75rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: 30px;
+            font-size: 0.85rem;
+            color: var(--cyan);
+            animation: bounce 2s infinite;
+            letter-spacing: 2px;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(-15px); opacity: 0.5; }
+        }
+
+        /* CONTENEDOR PRINCIPAL */
+        .main {
+            position: relative;
+            z-index: 1;
+            max-width: 1250px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        /* SECCIONES */
+        .section {
+            margin: 120px 0;
+            opacity: 0;
+            transform: translateY(60px);
+        }
+
+        .section-num {
+            font-size: 5rem;
+            font-weight: 900;
+            color: rgba(255,255,255,0.05);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: -30px;
+        }
+
+        .section-header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 25px;
+        }
+
+        .section-tag {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .tag-cyan { background: rgba(0,242,254,0.1); color: var(--cyan); border: 1px solid rgba(0,242,254,0.3); }
+        .tag-purple { background: rgba(178,36,239,0.1); color: var(--purple); border: 1px solid rgba(178,36,239,0.3); }
+        .tag-orange { background: rgba(249,115,22,0.1); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+        .tag-green { background: rgba(16,185,129,0.1); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+        .tag-red { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+        .tag-yellow { background: rgba(251,191,36,0.1); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+
+        .section h2 {
+            font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 15px;
+            letter-spacing: -1px;
+        }
+
+        .section .intro {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 900px;
+        }
+
+        /* GLASS CARDS */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 35px;
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(0, 242, 254, 0.3);
+        }
+
+        .glass-card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .glass-card h3 .icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .icon-cyan { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .icon-purple { background: rgba(178,36,239,0.15); color: var(--purple); }
+        .icon-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        .icon-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .icon-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
+        .icon-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+
+        .glass-card h4 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin: 20px 0 10px;
+            color: var(--cyan);
+        }
+
+        .glass-card p { color: var(--muted); margin-bottom: 12px; }
+        .glass-card ul { color: var(--muted); padding-left: 20px; margin-bottom: 15px; }
+        .glass-card ul li { margin-bottom: 6px; }
+        .glass-card strong { color: var(--text); }
+
+        /* GRID */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+        /* TABLAS */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead { background: rgba(0, 242, 254, 0.05); }
+
+        th {
+            text-align: left;
+            padding: 15px;
+            color: var(--cyan);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        tbody tr:hover { background: rgba(0, 242, 254, 0.03); }
+        tbody tr:last-child td { border-bottom: none; }
+        td strong { color: var(--text); font-family: 'Outfit', sans-serif; }
+        td .price { color: var(--green); font-weight: 700; }
+        td .price-red { color: var(--red); font-weight: 700; }
+        td .price-yellow { color: var(--yellow); font-weight: 700; }
+
+        /* CODE BLOCK */
+        .code-block {
+            background: #000814;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+            line-height: 1.7;
+        }
+
+        .code-block .comment { color: #6a9955; }
+        .code-block .cmd { color: var(--cyan); }
+        .code-block .arg { color: var(--yellow); }
+        .code-block .val { color: var(--purple); }
+        .code-block .num { color: var(--orange); }
+        .code-block .keyword { color: #c586c0; }
+        .code-block .string { color: #ce9178; }
+        .code-block .func { color: #dcdcaa; }
+        .code-block .var { color: #9cdcfe; }
+
+        /* CALLOUTS */
+        .callout {
+            display: flex;
+            gap: 15px;
+            padding: 20px;
+            border-radius: 14px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        .callout.info { background: rgba(0, 242, 254, 0.05); border-color: var(--cyan); }
+        .callout.warn { background: rgba(251, 191, 36, 0.05); border-color: var(--yellow); }
+        .callout.danger { background: rgba(239, 68, 68, 0.05); border-color: var(--red); }
+        .callout.success { background: rgba(16, 185, 129, 0.05); border-color: var(--green); }
+        .callout .callout-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+        .callout.info .callout-icon { color: var(--cyan); }
+        .callout.warn .callout-icon { color: var(--yellow); }
+        .callout.danger .callout-icon { color: var(--red); }
+        .callout.success .callout-icon { color: var(--green); }
+        .callout-content { flex: 1; }
+        .callout-content strong { color: var(--text); display: block; margin-bottom: 5px; }
+        .callout-content p { color: var(--muted); font-size: 0.95rem; margin: 0; }
+
+        /* TIMELINE */
+        .timeline { position: relative; padding-left: 40px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--cyan), var(--purple), transparent);
+        }
+
+        .timeline-item { position: relative; margin-bottom: 30px; }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -32px;
+            top: 5px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 2px solid var(--cyan);
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        .timeline-item h4 { color: var(--cyan); font-size: 1rem; margin-bottom: 8px; }
+        .timeline-item p { color: var(--muted); font-size: 0.92rem; }
+
+        /* METRIC CARDS */
+        .metric-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .metric-card:hover {
+            border-color: var(--cyan);
+            transform: translateY(-5px);
+        }
+        .metric-card .metric-label {
+            font-size: 0.72rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .metric-card .metric-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .metric-card .metric-sub { font-size: 0.8rem; color: var(--muted); }
+        .val-cyan { color: var(--cyan); }
+        .val-green { color: var(--green); }
+        .val-red { color: var(--red); }
+        .val-yellow { color: var(--yellow); }
+        .val-purple { color: var(--purple); }
+
+        /* COMPARATIVA */
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .compare-box { border-radius: 16px; padding: 25px; border: 1px solid; }
+        .compare-box.bad { background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.3); }
+        .compare-box.good { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.3); }
+        .compare-box h4 { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-size: 1.1rem; }
+        .compare-box.bad h4 { color: var(--red); }
+        .compare-box.good h4 { color: var(--green); }
+
+        /* BAR CHART */
+        .bar-chart { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .bar-row { display: flex; align-items: center; gap: 15px; }
+        .bar-label {
+            min-width: 180px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .bar-track {
+            flex: 1;
+            height: 30px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #000;
+            font-family: 'JetBrains Mono', monospace;
+            transition: width 1.5s ease;
+        }
+        .bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #00b8cc); }
+        .bar-fill.purple { background: linear-gradient(90deg, var(--purple), #8a1bc4); color: #fff; }
+        .bar-fill.green { background: linear-gradient(90deg, var(--green), #059669); }
+        .bar-fill.red { background: linear-gradient(90deg, var(--red), #b91c1c); color: #fff; }
+        .bar-fill.yellow { background: linear-gradient(90deg, var(--yellow), #d97706); }
+
+        /* PILL / BADGE */
+        .pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pill-cyan { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .pill-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        .pill-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .pill-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+        .pill-purple { background: rgba(178,36,239,0.15); color: var(--purple); }
+
+        /* TOC */
+        .toc {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 60px 0;
+        }
+        .toc h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--cyan);
+            margin-bottom: 20px;
+        }
+        .toc ol {
+            list-style: none;
+            counter-reset: toc-counter;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .toc ol li {
+            counter-increment: toc-counter;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .toc ol li::before {
+            content: counter(toc-counter, decimal-leading-zero);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+            background: rgba(0,242,254,0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,242,254,0.2);
+        }
+        .toc ol li a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+        .toc ol li:hover a { color: var(--cyan); }
+
+        /* TOPOLOGY DIAGRAM */
+        .topology {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 30px 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .topo-node {
+            flex: 1;
+            min-width: 130px;
+            text-align: center;
+            padding: 16px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            background: var(--panel-2);
+            position: relative;
+        }
+        .topo-node.source { border-color: var(--green); color: #86efac; background: rgba(16,185,129,0.1); }
+        .topo-node.transform { border-color: var(--cyan); color: #93c5fd; background: rgba(0,242,254,0.1); }
+        .topo-node.agg { border-color: var(--purple); color: #c4b5fd; background: rgba(178,36,239,0.1); }
+        .topo-node.sink { border-color: var(--orange); color: #fdba74; background: rgba(249,115,22,0.1); }
+        .topo-node .sub {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: normal;
+            color: var(--muted);
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .topo-arrow {
+            color: var(--cyan);
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        /* SAMPLE OUTPUT BLOCK */
+        .sample-output {
+            background: #000;
+            border: 1px solid var(--green);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            color: #86efac;
+            margin: 15px 0;
+            white-space: pre-wrap;
+        }
+        .sample-output .label {
+            color: var(--muted);
+            display: block;
+            margin-bottom: 8px;
+            border-bottom: 1px solid rgba(16,185,129,0.2);
+            padding-bottom: 6px;
+        }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 80px 20px 40px;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            margin-top: 120px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+            .grid-2, .grid-3, .grid-4, .compare-grid, .toc ol {
+                grid-template-columns: 1fr;
+            }
+            .nav-dots { display: none; }
+            .hero-stats { gap: 20px; }
+            .hero-stat .val { font-size: 1.6rem; }
+            .section { margin: 80px 0; }
+            .glass-card { padding: 25px; }
+            .bar-label { min-width: 120px; font-size: 0.75rem; }
+            .topology { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE PROGRESO -->
+    <div id="progress-bar"></div>
+
+    <!-- NAV DOTS -->
+    <div class="nav-dots">
+        <div class="nav-dot" data-label="Hero" data-target="hero"></div>
+        <div class="nav-dot" data-label="Contexto" data-target="contexto"></div>
+        <div class="nav-dot" data-label="Setup" data-target="setup"></div>
+        <div class="nav-dot" data-label="KPI" data-target="kpi"></div>
+        <div class="nav-dot" data-label="Recovery" data-target="recovery"></div>
+        <div class="nav-dot" data-label="Views" data-target="views"></div>
+        <div class="nav-dot" data-label="Monitor" data-target="monitor"></div>
+    </div>
+
+    <!-- FONDO 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- HERO -->
+    <section class="hero" id="hero">
+        <div class="hero-badge">Módulo 3 · Hands-On Lab</div>
+        <h1>Publish & Recover Dashboards from Streaming KPIs</h1>
+        <p class="lead">
+            ShopLive — Publicar un KPI de "orders per minute" en un dashboard, configurar refresh strategy, y validar recuperación via checkpoint tras una interrupción del stream.
+        </p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <div class="val">1 min</div>
+                <div class="lbl">Tumbling window</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">10 min</div>
+                <div class="lbl">Watermark</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">60s</div>
+                <div class="lbl">Auto-refresh recomendado</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">Exactly-once</div>
+                <div class="lbl">Via checkpoint</div>
+            </div>
+        </div>
+        <div class="scroll-hint">Desliza para explorar ↓</div>
+    </section>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- TOC -->
+        <div class="toc">
+            <h3><i class="fa-solid fa-list-check"></i> Contenido del Laboratorio</h3>
+            <ol>
+                <li><a href="#contexto">Contexto: ShopLive y el dashboard</a></li>
+                <li><a href="#setup">Setup: UC Volume y estructura</a></li>
+                <li><a href="#kpi">KPI: 1-min window + 10-min watermark</a></li>
+                <li><a href="#recovery">Recovery: Simulación de fallo</a></li>
+                <li><a href="#views">SQL Views para dashboards</a></li>
+                <li><a href="#monitor">Monitoreo y query progress</a></li>
+            </ol>
+        </div>
+
+        <!-- =========================================
+             SECCIÓN 1: CONTEXTO
+             ========================================= -->
+        <section class="section" id="contexto">
+            <div class="section-num">01</div>
+            <div class="section-header">
+                <span class="section-tag tag-cyan">Contexto</span>
+                <h2>ShopLive: El Dashboard de Campaña</h2>
+                <p class="intro">
+                    Executives necesitan un dashboard live durante una campaña de alto tráfico. El objetivo es publicar un KPI de <strong>orders per minute (OPM)</strong> y asegurar recuperación si el stream se interrumpe.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-bullseye"></i></span> Objetivos del Lab</h3>
+                <ul>
+                    <li>Conectar la streaming KPI table a <strong>Databricks AI/BI Dashboards</strong> (o Apache Superset).</li>
+                    <li>Configurar una <strong>refresh strategy</strong> (ej: 60-second auto-refresh o view limitada a últimos 60 min).</li>
+                    <li>Simular una <strong>interrupción del stream</strong> y restart del job, confirmando recovery via checkpoint.</li>
+                    <li>Verificar que los tiles del dashboard retornan valores correctos al resumir el stream.</li>
+                    <li>Inspeccionar <strong>query progress</strong> para entender throughput, latency y freshness trade-offs.</li>
+                </ul>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-database"></i></span> Esquema de Datos</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Tipo</th>
+                                <th>Descripción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>order_id</strong></td>
+                                <td><code>string</code></td>
+                                <td>Identificador de orden</td>
+                            </tr>
+                            <tr>
+                                <td><strong>event_time</strong></td>
+                                <td><code>timestamp</code></td>
+                                <td>Cuándo ocurrió el evento</td>
+                            </tr>
+                            <tr>
+                                <td><strong>customer_id</strong></td>
+                                <td><code>string</code></td>
+                                <td>Cliente</td>
+                            </tr>
+                            <tr>
+                                <td><strong>amount</strong></td>
+                                <td><code>double</code></td>
+                                <td>Monto de la orden</td>
+                            </tr>
+                            <tr>
+                                <td><strong>channel</strong></td>
+                                <td><code>string</code></td>
+                                <td>web, mobile, pos</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-circle-info"></i></div>
+                    <div class="callout-content">
+                        <strong>KPI Final</strong>
+                        <p>1-minute window + 10-minute watermark, filtrando eventos válidos (ej: status = 'PAID').</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-route"></i></span> Topología del Pipeline</h3>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-file"></i> File Simulator
+                        <span class="sub">inbox/</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-clock"></i> withWatermark
+                        <span class="sub">10 minutes</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-window-restore"></i> window(1 min)
+                        <span class="sub">count(*)</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-database"></i> Delta
+                        <span class="sub">delta_kpi_orders_minute</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-chart-line"></i> Dashboard
+                        <span class="sub">vw_kpi_orders_minute_last60</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 2: SETUP
+             ========================================= -->
+        <section class="section" id="setup">
+            <div class="section-num">02</div>
+            <div class="section-header">
+                <span class="section-tag tag-green">Activity 1</span>
+                <h2>Configurar UC Volume y Estructura</h2>
+                <p class="intro">
+                    En Databricks Free, todo debe vivir bajo un UC Volume. Configuramos catálogo, schema, volume, y las carpetas de trabajo.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-folder-tree"></i></span> Estructura de Carpetas</h3>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-folder"></i> shoplive_lab3
+                        <span class="sub">base_path</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-inbox"></i> inbox
+                        <span class="sub">JSON events</span>
+                    </div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-triangle-exclamation"></i> _bad
+                        <span class="sub">malformed</span>
+                    </div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-save"></i> _chk
+                        <span class="sub">checkpoints</span>
+                    </div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-database"></i> delta_kpi_orders_minute
+                        <span class="sub">KPI table</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-code"></i></span> Código de Setup</h3>
+                <div class="code-block">
+<span class="comment"># 0) Spark & UC Volume setup</span><br>
+<span class="keyword">from</span> pyspark.sql <span class="keyword">import</span> SparkSession<br>
+<span class="keyword">from</span> pyspark.sql.types <span class="keyword">import</span> StructType, StructField, StringType, TimestampType, DoubleType<br>
+<span class="keyword">from</span> pyspark.sql.functions <span class="keyword">import</span> col, from_json, window, count <span class="keyword">as</span> f_count<br>
+spark = SparkSession.builder.getOrCreate()<br><br>
+
+<span class="comment"># Configuración UC</span><br>
+CATALOG = <span class="string">"demo_cat"</span><br>
+SCHEMA  = <span class="string">"streams"</span><br>
+VOLUME  = <span class="string">"landing"</span><br><br>
+
+<span class="comment"># Crear UC objects si no existen</span><br>
+<span class="keyword">try</span>:<br>
+&nbsp;&nbsp;spark.sql(<span class="string">f"CREATE CATALOG IF NOT EXISTS {CATALOG}"</span>)<br>
+&nbsp;&nbsp;spark.sql(<span class="string">f"CREATE SCHEMA  IF NOT EXISTS {CATALOG}.{SCHEMA}"</span>)<br>
+&nbsp;&nbsp;spark.sql(<span class="string">f"CREATE VOLUME  IF NOT EXISTS {CATALOG}.{SCHEMA}.{VOLUME}"</span>)<br>
+&nbsp;&nbsp;print(<span class="string">"UC volume is ready."</span>)<br>
+<span class="keyword">except</span> Exception <span class="keyword">as</span> e:<br>
+&nbsp;&nbsp;print(<span class="string">"Warning: Could not create UC objects."</span>, e)<br><br>
+
+<span class="comment"># Paths base</span><br>
+base_path       = <span class="string">f"dbfs:/Volumes/{CATALOG}/{SCHEMA}/{VOLUME}/shoplive_lab3"</span><br>
+inbox_path      = <span class="string">f"{base_path}/inbox"</span><br>
+bad_path        = <span class="string">f"{base_path}/_bad"</span><br>
+checkpoint_root = <span class="string">f"{base_path}/_chk"</span><br>
+delta_kpi_path  = <span class="string">f"{base_path}/delta_kpi_orders_minute"</span><br><br>
+
+<span class="keyword">for</span> p <span class="keyword">in</span> [base_path, inbox_path, bad_path, checkpoint_root, delta_kpi_path]:<br>
+&nbsp;&nbsp;dbutils.fs.mkdirs(p)
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-wand-magic-sparkles"></i></span> Generador de Eventos</h3>
+                <p>Simula órdenes con <code>old_ratio</code> y <code>late_ratio</code> para probar watermarks:</p>
+                <div class="code-block">
+<span class="keyword">import</span> json, time, uuid, random<br>
+<span class="keyword">from</span> datetime <span class="keyword">import</span> datetime, timedelta<br><br>
+
+<span class="keyword">def</span> <span class="func">generate_orders_wave</span>(n_files=<span class="num">2</span>, rows_per_file=<span class="num">80</span>, late_ratio=<span class="num">0.1</span>, old_ratio=<span class="num">0.35</span>):<br>
+&nbsp;&nbsp;<span class="keyword">for</span> _ <span class="keyword">in</span> range(n_files):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path = <span class="string">f"{inbox_path}/batch_{int(time.time())}_{uuid.uuid4().hex}.json"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;lines = []<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">for</span> r <span class="keyword">in</span> range(rows_per_file):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;now = datetime.utcnow()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rnd = random.random()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> rnd &lt; old_ratio:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;et = now - timedelta(minutes=random.randint(<span class="num">12</span>, <span class="num">20</span>))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">elif</span> rnd &lt; old_ratio + late_ratio:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;et = now - timedelta(minutes=random.randint(<span class="num">1</span>, <span class="num">5</span>))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">else</span>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;et = now<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;evt = {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"order_id"</span>: uuid.uuid4().hex,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"event_time"</span>: et.strftime(<span class="string">"%Y-%m-%dT%H:%M:%S.%fZ"</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"customer_id"</span>: random.choice(customers),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"amount"</span>: round(random.uniform(<span class="num">5.0</span>, <span class="num">300.0</span>), <span class="num">2</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"channel"</span>: random.choice(channels)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lines.append(json.dumps(evt))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dbutils.fs.put(path, <span class="string">"\n"</span>.join(lines), overwrite=<span class="keyword">True</span>)
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 3: KPI
+             ========================================= -->
+        <section class="section" id="kpi">
+            <div class="section-num">03</div>
+            <div class="section-header">
+                <span class="section-tag tag-purple">Activities 2-3</span>
+                <h2>Schema y KPI: 1-min Window + 10-min Watermark</h2>
+                <p class="intro">
+                    Un KPI resiliente = event-time window + watermark-bounded state + checkpoint para resumability.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-table-columns"></i></span> Challenge 1: Schema + Source</h3>
+                <div class="code-block">
+orders_schema = StructType([<br>
+&nbsp;&nbsp;StructField(<span class="string">"order_id"</span>,    StringType(),   <span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"event_time"</span>,  TimestampType(),<span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"customer_id"</span>, StringType(),   <span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"amount"</span>,      DoubleType(),   <span class="keyword">True</span>),<br>
+&nbsp;&nbsp;StructField(<span class="string">"channel"</span>,     StringType(),   <span class="keyword">True</span>),<br>
+])<br><br>
+
+orders_df = (spark.readStream<br>
+&nbsp;&nbsp;.schema(orders_schema)<br>
+&nbsp;&nbsp;.option(<span class="string">"badRecordsPath"</span>, bad_path)<br>
+&nbsp;&nbsp;.option(<span class="string">"maxFilesPerTrigger"</span>, <span class="num">1</span>)<br>
+&nbsp;&nbsp;.json(inbox_path))
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-window-restore"></i></span> Challenge 2: KPI Aggregation</h3>
+                <div class="code-block">
+<span class="keyword">from</span> pyspark.sql.functions <span class="keyword">import</span> window, col, count <span class="keyword">as</span> f_count<br><br>
+
+kpi_df = (orders_df<br>
+&nbsp;&nbsp;.withWatermark(<span class="string">"event_time"</span>, <span class="string">"10 minutes"</span>)<br>
+&nbsp;&nbsp;.groupBy(window(col(<span class="string">"event_time"</span>), <span class="string">"1 minute"</span>))<br>
+&nbsp;&nbsp;.agg(f_count(<span class="string">"*"</span>).alias(<span class="string">"orders_per_minute"</span>))<br>
+)
+                </div>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-file"></i> orders_df
+                        <span class="sub">event_time</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-clock"></i> withWatermark
+                        <span class="sub">10 min</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-window-restore"></i> window(1 min)
+                        <span class="sub">tumbling</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-table"></i> kpi_df
+                        <span class="sub">window, orders_per_minute</span>
+                    </div>
+                </div>
+                <div class="callout warn">
+                    <div class="callout-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="callout-content">
+                        <strong>Watermark vs Window</strong>
+                        <p>Watermark (10 min) > Window (1 min). Esto permite que las ventanas finalicen correctamente después de aceptar eventos ligeramente tardíos.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-red"><i class="fa-solid fa-plug"></i></span> Challenge 3: Failure-aware Delta Sink</h3>
+                <p>Simula una interrupción antes de escribir a Delta usando <code>foreachBatch</code>:</p>
+                <div class="code-block">
+<span class="comment"># 4) Failure-aware streaming sink</span><br>
+SIMULATE_FAILURE = <span class="keyword">True</span>  <span class="comment"># toggle a False para recovery</span><br><br>
+
+<span class="keyword">def</span> <span class="func">write_batch</span>(batch_df, batch_id):<br>
+&nbsp;&nbsp;print(<span class="string">f"[write_batch] batch_id={batch_id}, rows={batch_df.count()}"</span>)<br>
+&nbsp;&nbsp;<span class="keyword">if</span> SIMULATE_FAILURE:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">raise</span> Exception(<span class="string">"Simulated interruption before Delta write"</span>)<br>
+&nbsp;&nbsp;(batch_df.write<br>
+&nbsp;&nbsp;&nbsp;&nbsp;.format(<span class="string">"delta"</span>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;.mode(<span class="string">"append"</span>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;.save(delta_kpi_path))<br><br>
+
+q_kpi = (kpi_df.writeStream<br>
+&nbsp;&nbsp;.foreachBatch(write_batch)<br>
+&nbsp;&nbsp;.option(<span class="string">"checkpointLocation"</span>, <span class="string">f"{checkpoint_root}/kpi"</span>)<br>
+&nbsp;&nbsp;.trigger(availableNow=<span class="keyword">True</span>)<br>
+&nbsp;&nbsp;.start())
+                </div>
+                <div class="callout danger">
+                    <div class="callout-icon"><i class="fa-solid fa-bomb"></i></div>
+                    <div class="callout-content">
+                        <strong>Simulación de fallo</strong>
+                        <p>Con <code>SIMULATE_FAILURE=True</code>, el job lanza excepción antes de escribir. El checkpoint registra que el batch falló, y en el siguiente run se reintenta desde el mismo offset.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 4: RECOVERY
+             ========================================= -->
+        <section class="section" id="recovery">
+            <div class="section-num">04</div>
+            <div class="section-header">
+                <span class="section-tag tag-red">Activity 5</span>
+                <h2>Recovery: Simulación y Restart</h2>
+                <p class="intro">
+                    Blackouts happen. Debemos probar recovery correcto reutilizando el mismo checkpoint y generando nuevos archivos.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-red"><i class="fa-solid fa-rotate-right"></i></span> Procedimiento de Recovery</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <h4>1. Detener el job (o lanzar excepción)</h4>
+                        <p>Con <code>SIMULATE_FAILURE=True</code>, el primer run falla antes de escribir.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>2. Generar nuevos archivos</h4>
+                        <p>Ejecutar <code>generate_orders_wave()</code> para simular nuevo tráfico entrante.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>3. Re-ejecutar con mismo checkpoint</h4>
+                        <p>Cambiar <code>SIMULATE_FAILURE=False</code> y re-lanzar el job. Spark retoma desde el offset fallido.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>4. Verificar no duplicados</h4>
+                        <p>Delta no debe duplicar filas de runs anteriores. Checkpoint tracks offsets + state + commit logs.</p>
+                    </div>
+                </div>
+                <div class="callout success">
+                    <div class="callout-icon"><i class="fa-solid fa-check-circle"></i></div>
+                    <div class="callout-content">
+                        <strong>Exactly-once semantics</strong>
+                        <p>El checkpoint permite que Spark retome desde el último offset commiteado. <code>numInputRows</code> refleja solo nuevos datos. Delta no duplica filas previas.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-eye"></i></span> Verification Output</h3>
+                <div class="sample-output">
+<span class="label">Last progress (post-recovery)</span>
+numInputRows: 0
+inputRowsPerSecond: 0.0
+processedRowsPerSecond: 0.0
+batchDuration: 1ms
+
+# Delta no duplica filas
+SELECT COUNT(*) FROM vw_kpi_orders_minute_all;
+→ 8 (sin cambios)
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 5: VIEWS
+             ========================================= -->
+        <section class="section" id="views">
+            <div class="section-num">05</div>
+            <div class="section-header">
+                <span class="section-tag tag-green">Activity 4</span>
+                <h2>SQL Views para Dashboards</h2>
+                <p class="intro">
+                    Los dashboards deben queryar <strong>stable views</strong> con friendly time windows, no tablas completas.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-database"></i></span> Registro de View (last60)</h3>
+                <div class="code-block">
+<span class="comment"># Crear UC VIEWS sobre el Delta path (works on Free)</span><br>
+spark.sql(<span class="string">f"""<br>
+CREATE OR REPLACE VIEW {CATALOG}.{SCHEMA}.vw_kpi_orders_minute_all AS<br>
+SELECT *<br>
+FROM delta.`{delta_kpi_path}`<br>
+"""</span>)<br><br>
+
+spark.sql(<span class="string">f"""<br>
+CREATE OR REPLACE VIEW {CATALOG}.{SCHEMA}.vw_kpi_orders_minute_last60 AS<br>
+SELECT<br>
+&nbsp;&nbsp;CAST(`window`.start AS TIMESTAMP) AS minute_start,<br>
+&nbsp;&nbsp;orders_per_minute<br>
+FROM {CATALOG}.{SCHEMA}.vw_kpi_orders_minute_all<br>
+WHERE `window`.start &gt;= current_timestamp() - INTERVAL 60 MINUTES<br>
+"""</span>)
+                </div>
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-lightbulb"></i></div>
+                    <div class="callout-content">
+                        <strong>Time-bounded views</strong>
+                        <p>Limitar a los últimos 60 minutos mejora latencia y reduce BI compute. Charts cargan solo los puntos que necesitan.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-chart-line"></i></span> Dashboard Connection</h3>
+                
+                <h4>Databricks AI/BI</h4>
+                <ol style="color: var(--muted); padding-left: 20px;">
+                    <li>SQL → Dashboards → New dashboard → Add tile (SQL).</li>
+                    <li>Query: <code>SELECT minute_start, orders_per_minute FROM vw_kpi_orders_minute_last60 ORDER BY minute_start DESC LIMIT 60</code>.</li>
+                    <li>Line/bar chart + Auto-refresh ≈ 60s.</li>
+                </ol>
+
+                <h4>Apache Superset</h4>
+                <ol style="color: var(--muted); padding-left: 20px;">
+                    <li>Connect to Databricks SQL Warehouse via JDBC.</li>
+                    <li>Create dataset based on the view.</li>
+                    <li>Build chart + auto-refresh 60-120s.</li>
+                </ol>
+
+                <div class="callout success">
+                    <div class="callout-icon"><i class="fa-solid fa-check-circle"></i></div>
+                    <div class="callout-content">
+                        <strong>Refresh strategy</strong>
+                        <p>60s balancea freshness y cost. Refrescar más rápido que el window size (1 min) no da beneficios visibles, solo quema compute.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 6: MONITOR
+             ========================================= -->
+        <section class="section" id="monitor">
+            <div class="section-num">06</div>
+            <div class="section-header">
+                <span class="section-tag tag-purple">Activity 7</span>
+                <h2>Monitoreo y Query Progress</h2>
+                <p class="intro">
+                    Visibilidad continua evita sorpresas en producción. <code>lastProgress</code> revela throughput, latency y state.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-gauge-high"></i></span> Métricas Clave</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Métrica</th>
+                                <th>Qué indica</th>
+                                <th>Red flag</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>inputRowsPerSecond</strong></td>
+                                <td>Velocidad de llegada</td>
+                                <td>—</td>
+                            </tr>
+                            <tr>
+                                <td><strong>processedRowsPerSecond</strong></td>
+                                <td>Velocidad de procesamiento</td>
+                                <td>Input >> Processed = falling behind</td>
+                            </tr>
+                            <tr>
+                                <td><strong>batchDuration</strong></td>
+                                <td>Tiempo de trigger</td>
+                                <td>Growing = can't keep up</td>
+                            </tr>
+                            <tr>
+                                <td><strong>stateOperators</strong></td>
+                                <td>Tamaño del state</td>
+                                <td>Growing = windows no finalizan</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Código de Inspección</h4>
+                <div class="code-block">
+p = query.lastProgress<br>
+print(p.get(<span class="string">"inputRowsPerSecond"</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p.get(<span class="string">"processedRowsPerSecond"</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;p.get(<span class="string">"batchDuration"</span>))
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-check-double"></i></span> Success Checklist</h3>
+                <ul>
+                    <li>UC Volume configurado con carpetas bajo <code>&lt;volume&gt;/shoplive_lab3</code>.</li>
+                    <li>1-minute KPI con 10-minute watermark persistido a Delta.</li>
+                    <li>Checkpoint reutilizado across re-runs (idempotency).</li>
+                    <li><code>last60</code> view registrada y queryable.</li>
+                    <li>Dashboard conectado con auto-refresh ≈ 60s.</li>
+                    <li>Recovery after failure validado sin duplicados.</li>
+                </ul>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-red"><i class="fa-solid fa-bug"></i></span> Common Issues & Solutions</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Problema</th>
+                                <th>Causa</th>
+                                <th>Solución</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Nothing on dashboard</strong></td>
+                                <td>Sin archivos antes de availableNow</td>
+                                <td>Ejecutar simulador primero</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Duplicates after re-run</strong></td>
+                                <td>Checkpoint cambiado</td>
+                                <td>Confirmar mismo checkpoint</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Permission/registration error</strong></td>
+                                <td>Sin UC privileges</td>
+                                <td>Usar Volume existente o pedir admin</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Null spikes on tile</strong></td>
+                                <td>View filtra incorrecto</td>
+                                <td>Asegurar view filtra ventana correcta</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Delta not found</strong></td>
+                                <td>Sink nunca corrió</td>
+                                <td>Ejecutar Delta sink al menos una vez</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-star"></i></span> Principios Clave</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <h4>1. Correctness y continuity importan tanto como freshness</h4>
+                        <p>Un dashboard que muestra números incorrectos es peor que uno que no actualiza.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>2. availableNow + checkpoint = idempotencia</h4>
+                        <p>Re-runs con mismo checkpoint no duplican output.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>3. Views bounded mejoran latencia</h4>
+                        <p>Query solo los últimos 60 min, no toda la historia.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>4. Monitor query progress continuamente</h4>
+                        <p>Detecta bottlenecks antes de que impacten el dashboard.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p style="font-size: 1rem; color: var(--text); margin-bottom: 10px;">
+            <i class="fa-solid fa-flask"></i> HOL: Publish & Recover Dashboards from Streaming KPIs
+        </p>
+        <p style="font-size: 0.85rem;">ShopLive · Spark Structured Streaming · Delta Lake · Checkpoint Recovery · Databricks AI/BI</p>
+        <p style="font-size: 0.75rem; margin-top: 15px; color: rgba(148,163,184,0.5);">
+            Basado en ShopLiveLab3_Starter_Dashboards.ipynb y ShopLiveLab3_Solution_Dashboards.ipynb
+        </p>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script>
+        // THREE.JS BACKGROUND
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050914, 0.0025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 15, 90);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const pointLight = new THREE.PointLight(0x00f2fe, 2, 500);
+        scene.add(pointLight);
+        scene.add(new THREE.AmbientLight(0x222222));
+        const fillLight = new THREE.PointLight(0xb224ef, 1, 500);
+        fillLight.position.set(-50, -50, -50);
+        scene.add(fillLight);
+
+        const planetGeo = new THREE.IcosahedronGeometry(12, 32);
+        const planetMat = new THREE.MeshPhongMaterial({
+            color: 0x0a0a1a, emissive: 0x00f2fe, emissiveIntensity: 0.4,
+            wireframe: true, transparent: true, opacity: 0.7
+        });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        scene.add(planet);
+
+        const coreGeo = new THREE.IcosahedronGeometry(11.5, 16);
+        const coreMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.3, metalness: 0.8 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(core);
+
+        const ringGeo = new THREE.TorusGeometry(20, 0.08, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.25 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        scene.add(ring);
+
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesCount = 2500;
+        const posArray = new Float32Array(particlesCount * 3);
+        for (let i = 0; i < particlesCount * 3; i += 3) {
+            const r = 30 + Math.random() * 140;
+            const t = Math.random() * Math.PI * 2;
+            const p = Math.acos((Math.random() * 2) - 1);
+            posArray[i] = r * Math.sin(p) * Math.cos(t);
+            posArray[i+1] = r * Math.sin(p) * Math.sin(t);
+            posArray[i+2] = r * Math.cos(p);
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.7, color: 0x00f2fe, transparent: true, opacity: 0.5,
+            blending: THREE.AdditiveBlending
+        });
+        const particlesMesh = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particlesMesh);
+
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+            planet.rotation.y += 0.0015;
+            core.rotation.y -= 0.0008;
+            ring.rotation.z += 0.004;
+            particlesMesh.rotation.y = t * 0.03;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // GSAP
+        gsap.registerPlugin(ScrollTrigger);
+
+        gsap.utils.toArray('.section').forEach(section => {
+            gsap.to(section, {
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 85%",
+                    toggleActions: "play none none none"
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1.2,
+                ease: "power3.out"
+            });
+        });
+
+        gsap.to(".hero h1", {
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: true
+            },
+            scale: 0.85,
+            opacity: 0,
+            y: 80
+        });
+
+        gsap.utils.toArray('.bar-fill').forEach(bar => {
+            const finalWidth = bar.style.width;
+            bar.style.width = '0%';
+            gsap.to(bar, {
+                scrollTrigger: {
+                    trigger: bar,
+                    start: "top 90%"
+                },
+                width: finalWidth,
+                duration: 1.5,
+                ease: "power2.out"
+            });
+        });
+
+        // PROGRESS BAR
+        const progressBar = document.getElementById('progress-bar');
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            progressBar.style.width = scrollPercent + '%';
+        });
+
+        // NAV DOTS
+        const dots = document.querySelectorAll('.nav-dot');
+        const sections = document.querySelectorAll('section[id]');
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const target = document.getElementById(dot.dataset.target);
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        const observerOptions = {
+            root: null,
+            rootMargin: '-40% 0px -55% 0px',
+            threshold: 0
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    dots.forEach(d => {
+                        d.classList.toggle('active', d.dataset.target === id);
+                    });
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => observer.observe(section));
+
+        // SMOOTH SCROLL TOC
+        document.querySelectorAll('.toc ol li a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop - 40,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

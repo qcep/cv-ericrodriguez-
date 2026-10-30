@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOL 2: Order-Payment Join con Windowed Aggregation</title>
+    
+    <!-- Fuentes e Iconos -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Three.js + GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #050914;
+            --panel: #0d1424;
+            --panel-2: #1a2236;
+            --text: #f3f4f6;
+            --muted: #94a3b8;
+            --cyan: #00f2fe;
+            --purple: #b224ef;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #fbbf24;
+            --orange: #f97316;
+            --pink: #ec4899;
+            --border: rgba(255,255,255,0.08);
+            --glass: rgba(13, 20, 36, 0.75);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* FONDO 3D */
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* BARRA DE PROGRESO */
+        #progress-bar {
+            position: fixed;
+            top: 0; left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--orange));
+            width: 0%;
+            z-index: 1000;
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        /* NAV DOTS */
+        .nav-dots {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .nav-dot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+        .nav-dot:hover, .nav-dot.active {
+            background: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan);
+            transform: scale(1.3);
+        }
+        .nav-dot::after {
+            content: attr(data-label);
+            position: absolute;
+            right: 25px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--panel);
+            color: var(--text);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            border: 1px solid var(--border);
+        }
+        .nav-dot:hover::after { opacity: 1; }
+
+        /* HERO */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 50px;
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--cyan);
+            font-size: 0.8rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5.5vw, 4.5rem);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: -2px;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #ffffff 0%, var(--cyan) 50%, var(--purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            max-width: 1100px;
+        }
+
+        .hero p.lead {
+            font-size: 1.15rem;
+            color: var(--muted);
+            max-width: 720px;
+            margin-bottom: 40px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .hero-stat { text-align: center; }
+        .hero-stat .val {
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .hero-stat .lbl {
+            font-size: 0.75rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .scroll-hint {
+            position: absolute;
+            bottom: 30px;
+            font-size: 0.85rem;
+            color: var(--cyan);
+            animation: bounce 2s infinite;
+            letter-spacing: 2px;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(-15px); opacity: 0.5; }
+        }
+
+        /* CONTENEDOR PRINCIPAL */
+        .main {
+            position: relative;
+            z-index: 1;
+            max-width: 1250px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        /* SECCIONES */
+        .section {
+            margin: 120px 0;
+            opacity: 0;
+            transform: translateY(60px);
+        }
+
+        .section-num {
+            font-size: 5rem;
+            font-weight: 900;
+            color: rgba(255,255,255,0.05);
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: -30px;
+        }
+
+        .section-header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 25px;
+        }
+
+        .section-tag {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 50px;
+            font-size: 0.7rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .tag-cyan { background: rgba(0,242,254,0.1); color: var(--cyan); border: 1px solid rgba(0,242,254,0.3); }
+        .tag-purple { background: rgba(178,36,239,0.1); color: var(--purple); border: 1px solid rgba(178,36,239,0.3); }
+        .tag-orange { background: rgba(249,115,22,0.1); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+        .tag-green { background: rgba(16,185,129,0.1); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+        .tag-red { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+        .tag-yellow { background: rgba(251,191,36,0.1); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+
+        .section h2 {
+            font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 15px;
+            letter-spacing: -1px;
+        }
+
+        .section .intro {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 900px;
+        }
+
+        /* GLASS CARDS */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 35px;
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, border-color 0.3s;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(0, 242, 254, 0.3);
+        }
+
+        .glass-card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .glass-card h3 .icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .icon-cyan { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .icon-purple { background: rgba(178,36,239,0.15); color: var(--purple); }
+        .icon-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        .icon-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .icon-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
+        .icon-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+        .icon-pink { background: rgba(236,72,153,0.15); color: var(--pink); }
+
+        .glass-card h4 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin: 20px 0 10px;
+            color: var(--cyan);
+        }
+
+        .glass-card p { color: var(--muted); margin-bottom: 12px; }
+        .glass-card ul { color: var(--muted); padding-left: 20px; margin-bottom: 15px; }
+        .glass-card ul li { margin-bottom: 6px; }
+        .glass-card strong { color: var(--text); }
+
+        /* GRID */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+        /* TABLAS */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin: 20px 0;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        thead { background: rgba(0, 242, 254, 0.05); }
+
+        th {
+            text-align: left;
+            padding: 15px;
+            color: var(--cyan);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        tbody tr:hover { background: rgba(0, 242, 254, 0.03); }
+        tbody tr:last-child td { border-bottom: none; }
+        td strong { color: var(--text); font-family: 'Outfit', sans-serif; }
+        td .price { color: var(--green); font-weight: 700; }
+        td .price-red { color: var(--red); font-weight: 700; }
+        td .price-yellow { color: var(--yellow); font-weight: 700; }
+
+        /* CODE BLOCK */
+        .code-block {
+            background: #000814;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            overflow-x: auto;
+            margin: 15px 0;
+            position: relative;
+            line-height: 1.7;
+        }
+
+        .code-block .comment { color: #6a9955; }
+        .code-block .cmd { color: var(--cyan); }
+        .code-block .arg { color: var(--yellow); }
+        .code-block .val { color: var(--purple); }
+        .code-block .num { color: var(--orange); }
+        .code-block .keyword { color: #c586c0; }
+        .code-block .string { color: #ce9178; }
+        .code-block .func { color: #dcdcaa; }
+        .code-block .var { color: #9cdcfe; }
+
+        /* CALLOUTS */
+        .callout {
+            display: flex;
+            gap: 15px;
+            padding: 20px;
+            border-radius: 14px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        .callout.info { background: rgba(0, 242, 254, 0.05); border-color: var(--cyan); }
+        .callout.warn { background: rgba(251, 191, 36, 0.05); border-color: var(--yellow); }
+        .callout.danger { background: rgba(239, 68, 68, 0.05); border-color: var(--red); }
+        .callout.success { background: rgba(16, 185, 129, 0.05); border-color: var(--green); }
+        .callout .callout-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+        .callout.info .callout-icon { color: var(--cyan); }
+        .callout.warn .callout-icon { color: var(--yellow); }
+        .callout.danger .callout-icon { color: var(--red); }
+        .callout.success .callout-icon { color: var(--green); }
+        .callout-content { flex: 1; }
+        .callout-content strong { color: var(--text); display: block; margin-bottom: 5px; }
+        .callout-content p { color: var(--muted); font-size: 0.95rem; margin: 0; }
+
+        /* TIMELINE */
+        .timeline { position: relative; padding-left: 40px; }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 15px;
+            top: 0; bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--cyan), var(--purple), transparent);
+        }
+
+        .timeline-item { position: relative; margin-bottom: 30px; }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -32px;
+            top: 5px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: 2px solid var(--cyan);
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        .timeline-item h4 { color: var(--cyan); font-size: 1rem; margin-bottom: 8px; }
+        .timeline-item p { color: var(--muted); font-size: 0.92rem; }
+
+        /* METRIC CARDS */
+        .metric-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 25px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .metric-card:hover {
+            border-color: var(--cyan);
+            transform: translateY(-5px);
+        }
+        .metric-card .metric-label {
+            font-size: 0.72rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        .metric-card .metric-value {
+            font-size: 2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .metric-card .metric-sub { font-size: 0.8rem; color: var(--muted); }
+        .val-cyan { color: var(--cyan); }
+        .val-green { color: var(--green); }
+        .val-red { color: var(--red); }
+        .val-yellow { color: var(--yellow); }
+        .val-purple { color: var(--purple); }
+
+        /* COMPARATIVA */
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .compare-box { border-radius: 16px; padding: 25px; border: 1px solid; }
+        .compare-box.bad { background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.3); }
+        .compare-box.good { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.3); }
+        .compare-box h4 { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; font-size: 1.1rem; }
+        .compare-box.bad h4 { color: var(--red); }
+        .compare-box.good h4 { color: var(--green); }
+
+        /* BAR CHART */
+        .bar-chart { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .bar-row { display: flex; align-items: center; gap: 15px; }
+        .bar-label {
+            min-width: 180px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .bar-track {
+            flex: 1;
+            height: 30px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #000;
+            font-family: 'JetBrains Mono', monospace;
+            transition: width 1.5s ease;
+        }
+        .bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #00b8cc); }
+        .bar-fill.purple { background: linear-gradient(90deg, var(--purple), #8a1bc4); color: #fff; }
+        .bar-fill.green { background: linear-gradient(90deg, var(--green), #059669); }
+        .bar-fill.red { background: linear-gradient(90deg, var(--red), #b91c1c); color: #fff; }
+        .bar-fill.yellow { background: linear-gradient(90deg, var(--yellow), #d97706); }
+
+        /* PILL / BADGE */
+        .pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pill-cyan { background: rgba(0,242,254,0.15); color: var(--cyan); }
+        .pill-green { background: rgba(16,185,129,0.15); color: var(--green); }
+        .pill-red { background: rgba(239,68,68,0.15); color: var(--red); }
+        .pill-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+        .pill-purple { background: rgba(178,36,239,0.15); color: var(--purple); }
+
+        /* TOC */
+        .toc {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 60px 0;
+        }
+        .toc h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--cyan);
+            margin-bottom: 20px;
+        }
+        .toc ol {
+            list-style: none;
+            counter-reset: toc-counter;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .toc ol li {
+            counter-increment: toc-counter;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .toc ol li::before {
+            content: counter(toc-counter, decimal-leading-zero);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+            background: rgba(0,242,254,0.1);
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(0,242,254,0.2);
+        }
+        .toc ol li a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+        .toc ol li:hover a { color: var(--cyan); }
+
+        /* TOPOLOGY DIAGRAM */
+        .topology {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 30px 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .topo-node {
+            flex: 1;
+            min-width: 130px;
+            text-align: center;
+            padding: 16px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            background: var(--panel-2);
+            position: relative;
+        }
+        .topo-node.source { border-color: var(--green); color: #86efac; background: rgba(16,185,129,0.1); }
+        .topo-node.transform { border-color: var(--cyan); color: #93c5fd; background: rgba(0,242,254,0.1); }
+        .topo-node.agg { border-color: var(--purple); color: #c4b5fd; background: rgba(178,36,239,0.1); }
+        .topo-node.sink { border-color: var(--orange); color: #fdba74; background: rgba(249,115,22,0.1); }
+        .topo-node .sub {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: normal;
+            color: var(--muted);
+            margin-top: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .topo-arrow {
+            color: var(--cyan);
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        /* SAMPLE EVENTS TABLE */
+        .event-flow {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .event-col {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid var(--border);
+        }
+        .event-col h5 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .event-col.orders h5 { color: var(--green); }
+        .event-col.payments h5 { color: var(--purple); }
+        .event-line {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            color: var(--muted);
+            padding: 6px 8px;
+            margin-bottom: 4px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 6px;
+            border-left: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .event-col.orders .event-line { border-left-color: var(--green); }
+        .event-col.payments .event-line { border-left-color: var(--purple); }
+
+        /* FOOTER */
+        footer {
+            text-align: center;
+            padding: 80px 20px 40px;
+            color: var(--muted);
+            border-top: 1px solid var(--border);
+            margin-top: 120px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+            .grid-2, .grid-3, .grid-4, .compare-grid, .toc ol, .event-flow {
+                grid-template-columns: 1fr;
+            }
+            .nav-dots { display: none; }
+            .hero-stats { gap: 20px; }
+            .hero-stat .val { font-size: 1.6rem; }
+            .section { margin: 80px 0; }
+            .glass-card { padding: 25px; }
+            .bar-label { min-width: 120px; font-size: 0.75rem; }
+            .topology { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE PROGRESO -->
+    <div id="progress-bar"></div>
+
+    <!-- NAV DOTS -->
+    <div class="nav-dots">
+        <div class="nav-dot" data-label="Hero" data-target="hero"></div>
+        <div class="nav-dot" data-label="Escenario" data-target="escenario"></div>
+        <div class="nav-dot" data-label="Setup Kafka" data-target="setup"></div>
+        <div class="nav-dot" data-label="Join" data-target="join"></div>
+        <div class="nav-dot" data-label="Agregación" data-target="agregacion"></div>
+        <div class="nav-dot" data-label="Exactly-Once" data-target="exactlyonce"></div>
+        <div class="nav-dot" data-label="Validación" data-target="validacion"></div>
+        <div class="nav-dot" data-label="Resumen" data-target="resumen"></div>
+    </div>
+
+    <!-- FONDO 3D -->
+    <div id="canvas-container"></div>
+
+    <!-- HERO -->
+    <section class="hero" id="hero">
+        <div class="hero-badge">Módulo 2 · Hands-On Practice</div>
+        <h1>Order-Payment Join con Windowed Aggregation</h1>
+        <p class="lead">
+            Implementación completa de una aplicación Kafka Streams que une streams de órdenes y pagos en tiempo real, agrega ingresos por categoría en ventanas tumbling de 5 minutos y garantiza exactly-once semantics.
+        </p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <div class="val">50K</div>
+                <div class="lbl">Órdenes/hora en pico</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">10K</div>
+                <div class="lbl">Órdenes/minuto</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">5 min</div>
+                <div class="lbl">Ventana de join</div>
+            </div>
+            <div class="hero-stat">
+                <div class="val">&lt;10s</div>
+                <div class="lbl">Latencia end-to-end</div>
+            </div>
+        </div>
+        <div class="scroll-hint">Desliza para explorar ↓</div>
+    </section>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <!-- TOC -->
+        <div class="toc">
+            <h3><i class="fa-solid fa-list-check"></i> Contenido del Laboratorio</h3>
+            <ol>
+                <li><a href="#escenario">Escenario: QuickCommerce</a></li>
+                <li><a href="#setup">Actividad 1: Setup del entorno Kafka</a></li>
+                <li><a href="#join">Actividad 2: Implementar Stream-Stream Join</a></li>
+                <li><a href="#agregacion">Actividad 3: Windowed Aggregation</a></li>
+                <li><a href="#exactlyonce">Exactly-Once Semantics</a></li>
+                <li><a href="#validacion">Actividad 4: Test y Validación</a></li>
+                <li><a href="#resumen">Resumen y entregables</a></li>
+            </ol>
+        </div>
+
+        <!-- =========================================
+             SECCIÓN 1: ESCENARIO
+             ========================================= -->
+        <section class="section" id="escenario">
+            <div class="section-num">01</div>
+            <div class="section-header">
+                <span class="section-tag tag-cyan">Contexto</span>
+                <h2>Escenario: QuickCommerce</h2>
+                <p class="intro">
+                    Eres Data Engineer en QuickCommerce, una plataforma e-commerce que procesa 50,000 órdenes por hora en pico. El equipo de BI necesita tracking de ingresos en tiempo real, pero actualmente los datos solo están disponibles 12 horas después vía ETL batch nocturno.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-bullseye"></i></span> Requisitos del Sistema</h3>
+                <div class="grid-4">
+                    <div class="metric-card">
+                        <div class="metric-label">Throughput pico</div>
+                        <div class="metric-value val-cyan">10K</div>
+                        <div class="metric-sub">órdenes/minuto</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Delay de pagos</div>
+                        <div class="metric-value val-yellow">30s–2min</div>
+                        <div class="metric-sub">latencia del gateway</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Latencia objetivo</div>
+                        <div class="metric-value val-green">&lt;10s</div>
+                        <div class="metric-sub">pago → output</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Garantía</div>
+                        <div class="metric-value val-purple">EOS</div>
+                        <div class="metric-sub">exactly-once</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-database"></i></span> Esquemas de Datos</h3>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tópico</th>
+                                <th>Esquema</th>
+                                <th>Propósito</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>orders</strong></td>
+                                <td><code>{order_id, category_id, customer_id, timestamp}</code></td>
+                                <td>Eventos de creación de orden</td>
+                            </tr>
+                            <tr>
+                                <td><strong>payments</strong></td>
+                                <td><code>{order_id, payment_amount, payment_method, timestamp}</code></td>
+                                <td>Confirmaciones de pago</td>
+                            </tr>
+                            <tr>
+                                <td><strong>category-revenue</strong></td>
+                                <td><code>{category_id, window_start, window_end, total_revenue, order_count}</code></td>
+                                <td>Output agregado por ventana</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-diagram-project"></i></span> Topología Objetivo</h3>
+                <div class="topology">
+                    <div class="topo-node source">
+                        <i class="fa-solid fa-receipt"></i> Orders Topic
+                        <span class="sub">8 particiones</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-code-branch"></i> Stream-Stream Join
+                        <span class="sub">5 min window</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-layer-group"></i> groupBy(category)
+                        <span class="sub">repartition</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-window-restore"></i> Tumbling Window
+                        <span class="sub">5 min</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-chart-line"></i> category-revenue
+                        <span class="sub">4 particiones</span>
+                    </div>
+                </div>
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-circle-info"></i></div>
+                    <div class="callout-content">
+                        <strong>Nota sobre co-partitioning</strong>
+                        <p>Los topics <code>orders</code> y <code>payments</code> deben tener <strong>el mismo número de particiones (8)</strong> y usar la misma key (<code>order_id</code>) para que los eventos relacionados aterricen en la misma partición.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 2: SETUP KAFKA
+             ========================================= -->
+        <section class="section" id="setup">
+            <div class="section-num">02</div>
+            <div class="section-header">
+                <span class="section-tag tag-green">Actividad 1</span>
+                <h2>Setup del Entorno Kafka</h2>
+                <p class="intro">
+                    Iniciar un clúster Kafka local de 3 brokers con Docker Compose y crear los tres topics con los counts de particiones correctos.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-docker"></i></span> Paso 1: Iniciar el Clúster</h3>
+                <div class="code-block">
+                    <span class="cmd">docker-compose</span> up <span class="arg">-d</span><br>
+                    <span class="cmd">docker</span> ps <span class="comment"># verificar 3 brokers healthy</span>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-receipt"></i></span> Paso 2: Crear Topic "orders"</h3>
+                <p>8 particiones, keyed por <code>order_id</code>, replication factor 3 (cluster de 3 brokers).</p>
+                <div class="code-block">
+                    <span class="cmd">kafka-topics.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 \<br>
+                    &nbsp;&nbsp;<span class="arg">--create</span> <span class="arg">--topic</span> orders \<br>
+                    &nbsp;&nbsp;<span class="arg">--partitions</span> <span class="num">8</span> \<br>
+                    &nbsp;&nbsp;<span class="arg">--replication-factor</span> <span class="num">3</span> \<br>
+                    &nbsp;&nbsp;<span class="arg">--config</span> cleanup.policy=delete
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-credit-card"></i></span> Paso 3: Crear Topic "payments" (Co-partitioned)</h3>
+                <p>Mismo número de particiones (8) para habilitar el join distribuido.</p>
+                <div class="code-block">
+                    <span class="cmd">kafka-topics.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 \<br>
+                    &nbsp;&nbsp;<span class="arg">--create</span> <span class="arg">--topic</span> payments \<br>
+                    &nbsp;&nbsp;<span class="arg">--partitions</span> <span class="num">8</span> \<br>
+                    &nbsp;&nbsp;<span class="arg">--replication-factor</span> <span class="num">3</span> \<br>
+                    &nbsp;&nbsp;<span class="arg">--config</span> cleanup.policy=delete
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-chart-line"></i></span> Paso 4: Crear Topic de Salida</h3>
+                <div class="code-block">
+                    <span class="cmd">kafka-topics.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 \<br>
+                    &nbsp;&nbsp;<span class="arg">--create</span> <span class="arg">--topic</span> category-revenue \<br>
+                    &nbsp;&nbsp;<span class="arg">--partitions</span> <span class="num">4</span> \<br>
+                    &nbsp;&nbsp;<span class="arg">--replication-factor</span> <span class="num">3</span>
+                </div>
+                <p>Verificar todos los topics:</p>
+                <div class="code-block">
+                    <span class="cmd">kafka-topics.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 <span class="arg">--list</span>
+                </div>
+                <div class="callout success">
+                    <div class="callout-icon"><i class="fa-solid fa-check"></i></div>
+                    <div class="callout-content">
+                        <strong>Output esperado</strong>
+                        <p><code>category-revenue</code>, <code>orders</code>, <code>payments</code> — los tres con los counts de particiones correctos.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="callout warn">
+                <div class="callout-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="callout-content">
+                    <strong>Regla crítica de co-partitioning</strong>
+                    <p>Ambos topics deben tener <strong>8 particiones</strong> y usar <strong>order_id como key</strong>. Si no cumplen esto, el join fallará silenciosamente: eventos relacionados serán procesados por instancias distintas y nunca se encontrarán.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 3: STREAM-STREAM JOIN
+             ========================================= -->
+        <section class="section" id="join">
+            <div class="section-num">03</div>
+            <div class="section-header">
+                <span class="section-tag tag-purple">Actividad 2</span>
+                <h2>Implementar el Stream-Stream Join</h2>
+                <p class="intro">
+                    Definir los modelos de datos, crear el esqueleto de la aplicación Kafka Streams e implementar el join entre <code>orders</code> y <code>payments</code> con una ventana de 5 minutos.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-cube"></i></span> Modelos de Datos</h3>
+                
+                <h4>Order.java</h4>
+                <div class="code-block">
+<span class="keyword">public class</span> <span class="func">Order</span> {<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">orderId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">categoryId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">customerId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">timestamp</span>;<br><br>
+&nbsp;&nbsp;<span class="comment">// getters, setters, constructors, empty constructor</span><br>
+}
+                </div>
+
+                <h4>Payment.java</h4>
+                <div class="code-block">
+<span class="keyword">public class</span> <span class="func">Payment</span> {<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">orderId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">double</span> <span class="var">paymentAmount</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">paymentMethod</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">timestamp</span>;<br><br>
+&nbsp;&nbsp;<span class="comment">// getters, setters, constructors</span><br>
+}
+                </div>
+
+                <h4>OrderPayment.java (resultado del join)</h4>
+                <div class="code-block">
+<span class="keyword">public class</span> <span class="func">OrderPayment</span> {<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">orderId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">categoryId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">customerId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">double</span> <span class="var">paymentAmount</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">paymentMethod</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">orderTimestamp</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">paymentTimestamp</span>;<br>
+}
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-code-branch"></i></span> Implementación del Join</h3>
+                <div class="code-block">
+<span class="comment">// 1. Leer streams desde los topics</span><br>
+KStream&lt;String, Order&gt; orders = builder.stream(<span class="string">"orders"</span>,<br>
+&nbsp;&nbsp;Consumed.with(Serdes.String(), orderSerde));<br><br>
+
+KStream&lt;String, Payment&gt; payments = builder.stream(<span class="string">"payments"</span>,<br>
+&nbsp;&nbsp;Consumed.with(Serdes.String(), paymentSerde));<br><br>
+
+<span class="comment">// 2. Asegurar que ambos streams estén keyed por order_id</span><br>
+<span class="comment">// (las keys ya deben venir correctamente desde los producers)</span><br><br>
+
+<span class="comment">// 3. Realizar el join con ventana de 5 minutos</span><br>
+KStream&lt;String, OrderPayment&gt; joined = orders.<span class="func">join</span>(<br>
+&nbsp;&nbsp;payments,<br>
+&nbsp;&nbsp;<span class="comment">// ValueJoiner: combina Order + Payment</span><br>
+&nbsp;&nbsp;(order, payment) -&gt; <span class="keyword">new</span> <span class="func">OrderPayment</span>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;order.getOrderId(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;order.getCategoryId(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;order.getCustomerId(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;payment.getPaymentAmount(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;payment.getPaymentMethod(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;order.getTimestamp(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;payment.getTimestamp()<br>
+&nbsp;&nbsp;),<br>
+&nbsp;&nbsp;<span class="comment">// Join window de 5 minutos (sin grace period)</span><br>
+&nbsp;&nbsp;<span class="func">JoinWindows.ofTimeDifferenceWithNoGrace</span>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Duration.<span class="func">ofMinutes</span>(<span class="num">5</span>)),<br>
+&nbsp;&nbsp;Joined.with(Serdes.String(), orderSerde, paymentSerde)<br>
+);
+                </div>
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-lightbulb"></i></div>
+                    <div class="callout-content">
+                        <strong>¿Por qué 5 minutos?</strong>
+                        <p>El gateway de pago puede tardar entre 30 segundos y 2 minutos. La ventana de 5 minutos cubre ese rango con margen, capturando ~99.7% de los matches (como aprendimos del caso Food Delivery).</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-sliders"></i></span> Serdes Personalizados</h3>
+                <div class="code-block">
+<span class="keyword">public class</span> <span class="func">JsonSerde</span>&lt;T&gt; <span class="keyword">extends</span> <span class="func">Serde</span> {<br>
+&nbsp;&nbsp;<span class="keyword">private final</span> ObjectMapper mapper = <span class="keyword">new</span> <span class="func">ObjectMapper</span>();<br>
+&nbsp;&nbsp;<span class="keyword">private final</span> Class&lt;T&gt; type;<br><br>
+&nbsp;&nbsp;<span class="keyword">public</span> <span class="func">JsonSerde</span>(Class&lt;T&gt; type) { <span class="keyword">this</span>.type = type; }<br><br>
+&nbsp;&nbsp;<span class="annotation">@Override</span><br>
+&nbsp;&nbsp;<span class="keyword">public void</span> <span class="func">configure</span>(Map&lt;String, ?&gt; configs, <span class="keyword">boolean</span> isKey) {}<br><br>
+&nbsp;&nbsp;<span class="annotation">@Override</span><br>
+&nbsp;&nbsp;<span class="keyword">public void</span> <span class="func">close</span>() {}<br><br>
+&nbsp;&nbsp;<span class="annotation">@Override</span><br>
+&nbsp;&nbsp;<span class="keyword">public</span> Serializer&lt;T&gt; <span class="func">serializer</span>() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> (topic, data) -&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">try</span> { <span class="keyword">return</span> data == <span class="keyword">null</span> ? <span class="keyword">null</span> : mapper.writeValueAsBytes(data); }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">catch</span> (Exception e) { <span class="keyword">throw new</span> <span class="func">SerializationException</span>(e); }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;};<br>
+&nbsp;&nbsp;}<br><br>
+&nbsp;&nbsp;<span class="annotation">@Override</span><br>
+&nbsp;&nbsp;<span class="keyword">public</span> Deserializer&lt;T&gt; <span class="func">deserializer</span>() {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> (topic, data) -&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">try</span> { <span class="keyword">return</span> data == <span class="keyword">null</span> ? <span class="keyword">null</span> : mapper.readValue(data, type); }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">catch</span> (Exception e) { <span class="keyword">throw new</span> <span class="func">SerializationException</span>(e); }<br>
+&nbsp;&nbsp;&nbsp;&nbsp;};<br>
+&nbsp;&nbsp;}<br>
+}
+                </div>
+            </div>
+
+            <div class="callout success">
+                <div class="callout-icon"><i class="fa-solid fa-check"></i></div>
+                <div class="callout-content">
+                    <strong>Output esperado</strong>
+                    <p>Un <code>KStream&lt;String, OrderPayment&gt;</code> donde la key es <code>order_id</code> y el value combina los campos de Order y Payment.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 4: WINDOWED AGGREGATION
+             ========================================= -->
+        <section class="section" id="agregacion">
+            <div class="section-num">04</div>
+            <div class="section-header">
+                <span class="section-tag tag-orange">Actividad 3</span>
+                <h2>Agregación por Ventana Tumbling</h2>
+                <p class="intro">
+                    Re-keyear el stream por <code>category_id</code>, aplicar ventanas tumbling de 5 minutos y agregar los ingresos totales y el conteo de órdenes por categoría.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-layer-group"></i></span> Flujo de la Agregación</h3>
+                <div class="topology">
+                    <div class="topo-node transform">
+                        <i class="fa-solid fa-code-branch"></i> KStream Join
+                        <span class="sub">key: order_id</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-key"></i> groupBy
+                        <span class="sub">key: category_id</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node agg">
+                        <i class="fa-solid fa-window-restore"></i> windowedBy
+                        <span class="sub">TimeWindows(5m)</span>
+                    </div>
+                    <div class="topo-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+                    <div class="topo-node sink">
+                        <i class="fa-solid fa-chart-line"></i> aggregate
+                        <span class="sub">CategoryRevenue</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-calculator"></i></span> Implementación</h3>
+
+                <h4>CategoryRevenue.java</h4>
+                <div class="code-block">
+<span class="keyword">public class</span> <span class="func">CategoryRevenue</span> {<br>
+&nbsp;&nbsp;<span class="keyword">private</span> String <span class="var">categoryId</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">windowStart</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">windowEnd</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">double</span> <span class="var">totalRevenue</span>;<br>
+&nbsp;&nbsp;<span class="keyword">private</span> <span class="keyword">long</span> <span class="var">orderCount</span>;<br>
+}
+                </div>
+
+                <h4>Topología de Agregación</h4>
+                <div class="code-block">
+<span class="comment">// 1. Rekeyear por category_id (trigger repartition)</span><br>
+KGroupedStream&lt;String, OrderPayment&gt; grouped = joined<br>
+&nbsp;&nbsp;.<span class="func">groupBy</span>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(orderId, op) -&gt; op.getCategoryId(),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Grouped.with(Serdes.String(), orderPaymentSerde)<br>
+&nbsp;&nbsp;);<br><br>
+
+<span class="comment">// 2. Aplicar ventanas tumbling de 5 minutos</span><br>
+TimeWindowedKStream&lt;String, OrderPayment&gt; windowed = grouped<br>
+&nbsp;&nbsp;.<span class="func">windowedBy</span>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="func">TimeWindows.ofSizeWithNoGrace</span>(Duration.<span class="func">ofMinutes</span>(<span class="num">5</span>))<br>
+&nbsp;&nbsp;);<br><br>
+
+<span class="comment">// 3. Agregar: sum(payment_amount) + count(orders)</span><br>
+KTable&lt;Windowed&lt;String&gt;, CategoryRevenue&gt; revenue = windowed<br>
+&nbsp;&nbsp;.<span class="func">aggregate</span>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// Initializer</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;() -&gt; <span class="keyword">new</span> <span class="func">CategoryRevenue</span>(<span class="keyword">null</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.0</span>, <span class="num">0</span>),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// Adder</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;(category, op, agg) -&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;agg.setCategoryId(category);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;agg.setTotalRevenue(agg.getTotalRevenue() + op.getPaymentAmount());<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;agg.setOrderCount(agg.getOrderCount() + <span class="num">1</span>);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> agg;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">// Materialize con nombre de state store</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;Materialized.&lt;String, CategoryRevenue, WindowStore&lt;Bytes, <span class="keyword">byte</span>[]&gt;&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="func">as</span>(<span class="string">"category-revenue-store"</span>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.withKeySerde(Serdes.String())<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.withValueSerde(categoryRevenueSerde)<br>
+&nbsp;&nbsp;);<br><br>
+
+<span class="comment">// 4. Convertir a KStream y escribir al topic</span><br>
+revenue.<span class="func">toStream</span>()<br>
+&nbsp;&nbsp;.<span class="func">map</span>((windowedKey, value) -&gt; {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;value.setWindowStart(windowedKey.window().start());<br>
+&nbsp;&nbsp;&nbsp;&nbsp;value.setWindowEnd(windowedKey.window().end());<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> KeyValue.<span class="func">pair</span>(value.getCategoryId(), value);<br>
+&nbsp;&nbsp;})<br>
+&nbsp;&nbsp;.<span class="func">to</span>(<span class="string">"category-revenue"</span>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Produced.with(Serdes.String(), categoryRevenueSerde));
+                </div>
+            </div>
+
+            <div class="callout warn">
+                <div class="callout-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="callout-content">
+                    <strong>Repartition Esperado</strong>
+                    <p>El <code>groupBy()</code> cambia la key de <code>order_id</code> a <code>category_id</code>, lo que dispara un repartition interno. Esto es necesario y esperado: Kafka Streams crea un topic interno de repartición para redistribuir los eventos por la nueva key.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 5: EXACTLY-ONCE
+             ========================================= -->
+        <section class="section" id="exactlyonce">
+            <div class="section-num">05</div>
+            <div class="section-header">
+                <span class="section-tag tag-red">Garantía</span>
+                <h2>Exactly-Once Semantics (EOS)</h2>
+                <p class="intro">
+                    Configurar <code>processing.guarantee=exactly_once_v2</code> para garantizar que no haya doble conteo de ingresos, incluso ante fallos o reinicios.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-red"><i class="fa-solid fa-shield-halved"></i></span> Configuración</h3>
+                <div class="code-block">
+<span class="comment"># application.properties</span><br>
+application.id=<span class="string">quickcommerce-revenue</span><br>
+bootstrap.servers=localhost:9092<br>
+default.key.serde=org.apache.kafka.common.serialization.<span class="func">Serdes$StringSerde</span><br>
+default.value.serde=com.example.<span class="func">JsonSerde</span><br><br>
+
+<span class="comment"># EXACTLY-ONCE SEMANTICS v2</span><br>
+processing.guarantee=<span class="val">exactly_once_v2</span><br><br>
+
+<span class="comment"># Optimizaciones</span><br>
+commit.interval.ms=<span class="num">100</span><br>
+cache.max.bytes.buffering=<span class="num">10485760</span><br>
+num.stream.threads=<span class="num">4</span>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-cogs"></i></span> ¿Qué hace exactly_once_v2?</h3>
+                <div class="grid-3">
+                    <div class="metric-card">
+                        <div class="metric-label">Idempotent Producer</div>
+                        <div class="metric-value val-cyan">✓</div>
+                        <div class="metric-sub">Sin duplicados en retry</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Transactional Writes</div>
+                        <div class="metric-value val-purple">✓</div>
+                        <div class="metric-sub">Atomicidad de output + state</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Read-Committed</div>
+                        <div class="metric-value val-green">✓</div>
+                        <div class="metric-sub">Consumidores ven solo commits</div>
+                    </div>
+                </div>
+                <div class="callout info">
+                    <div class="callout-icon"><i class="fa-solid fa-circle-info"></i></div>
+                    <div class="callout-content">
+                        <strong>EOS v2 vs v1</strong>
+                        <p>v2 (Kafka 3.0+) es más eficiente: no requiere un topic de transacciones por tarea, y funciona nativamente con brokers en KRaft mode. Es el estándar para nuevas aplicaciones.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-check-double"></i></span> Garantías Resultantes</h3>
+                <div class="compare-grid">
+                    <div class="compare-box bad">
+                        <h4><i class="fa-solid fa-xmark"></i> Sin EOS (at-least-once)</h4>
+                        <ul>
+                            <li>Posibles duplicados en retry</li>
+                            <li>Revenue inflado tras fallos</li>
+                            <li>Inconsistencia entre state y output</li>
+                            <li>Requiere deduplicación downstream</li>
+                        </ul>
+                    </div>
+                    <div class="compare-box good">
+                        <h4><i class="fa-solid fa-check"></i> Con EOS v2</h4>
+                        <ul>
+                            <li>Sin duplicados (idempotent producer)</li>
+                            <li>Revenue exacto siempre</li>
+                            <li>Atomicidad state + output</li>
+                            <li>Consumidores leen solo commits</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 6: VALIDACIÓN
+             ========================================= -->
+        <section class="section" id="validacion">
+            <div class="section-num">06</div>
+            <div class="section-header">
+                <span class="section-tag tag-cyan">Actividad 4</span>
+                <h2>Test y Validación</h2>
+                <p class="intro">
+                    Publicar eventos de muestra, verificar agregaciones correctas y validar exactly-once mediante reinicio de la aplicación.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-receipt"></i></span> Paso 1-2: Enviar Eventos de Muestra</h3>
+                <div class="event-flow">
+                    <div class="event-col orders">
+                        <h5><i class="fa-solid fa-arrow-right"></i> orders topic</h5>
+                        <div class="event-line">{"order_id":"O001","category_id":"electronics","customer_id":"C1","timestamp":1000}</div>
+                        <div class="event-line">{"order_id":"O002","category_id":"books","customer_id":"C2","timestamp":1100}</div>
+                        <div class="event-line">{"order_id":"O003","category_id":"electronics","customer_id":"C3","timestamp":1500}</div>
+                        <div class="event-line">{"order_id":"O004","category_id":"books","customer_id":"C4","timestamp":2000}</div>
+                    </div>
+                    <div class="event-col payments">
+                        <h5><i class="fa-solid fa-arrow-right"></i> payments topic (con delays)</h5>
+                        <div class="event-line">{"order_id":"O001","payment_amount":299.99,"payment_method":"card","timestamp":1030}</div>
+                        <div class="event-line">{"order_id":"O002","payment_amount":19.99,"payment_method":"paypal","timestamp":1250}</div>
+                        <div class="event-line">{"order_id":"O003","payment_amount":149.50,"payment_method":"card","timestamp":1900}</div>
+                        <div class="event-line">{"order_id":"O004","payment_amount":25.00,"payment_method":"card","timestamp":2150}</div>
+                    </div>
+                </div>
+                <div class="code-block">
+<span class="comment"># Producer de orders</span><br>
+<span class="cmd">kafka-console-producer.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 \<br>
+&nbsp;&nbsp;<span class="arg">--topic</span> orders \<br>
+&nbsp;&nbsp;<span class="arg">--property</span> <span class="string">"parse.key=true"</span> \<br>
+&nbsp;&nbsp;<span class="arg">--property</span> <span class="string">"key.separator=:"</span><br><br>
+<span class="comment"># Dentro del prompt, ingresar:</span><br>
+O001:{"order_id":"O001","category_id":"electronics","customer_id":"C1","timestamp":1000}<br>
+O002:{"order_id":"O002","category_id":"books","customer_id":"C2","timestamp":1100}<br>
+...<br><br>
+
+<span class="comment"># Producer de payments (ejecutar con delays reales)</span><br>
+<span class="cmd">kafka-console-producer.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 \<br>
+&nbsp;&nbsp;<span class="arg">--topic</span> payments \<br>
+&nbsp;&nbsp;<span class="arg">--property</span> <span class="string">"parse.key=true"</span> \<br>
+&nbsp;&nbsp;<span class="arg">--property</span> <span class="string">"key.separator=:"</span>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-orange"><i class="fa-solid fa-eye"></i></span> Paso 3: Consumir y Verificar Output</h3>
+                <div class="code-block">
+<span class="cmd">kafka-console-consumer.sh</span> <span class="arg">--bootstrap-server</span> localhost:9092 \<br>
+&nbsp;&nbsp;<span class="arg">--topic</span> category-revenue \<br>
+&nbsp;&nbsp;<span class="arg">--from-beginning</span> \<br>
+&nbsp;&nbsp;<span class="arg">--property</span> print.key=true
+                </div>
+
+                <h4>Output esperado (ventana 10:00–10:05 aprox)</h4>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>category_id</th>
+                                <th>window_start</th>
+                                <th>window_end</th>
+                                <th>total_revenue</th>
+                                <th>order_count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>electronics</strong></td>
+                                <td>10:00:00</td>
+                                <td>10:05:00</td>
+                                <td class="price">$449.49</td>
+                                <td>2</td>
+                            </tr>
+                            <tr>
+                                <td><strong>books</strong></td>
+                                <td>10:00:00</td>
+                                <td>10:05:00</td>
+                                <td class="price">$44.99</td>
+                                <td>2</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="callout success">
+                    <div class="callout-icon"><i class="fa-solid fa-calculator"></i></div>
+                    <div class="callout-content">
+                        <strong>Verificación matemática</strong>
+                        <p><strong>electronics</strong>: $299.99 (O001) + $149.50 (O003) = <strong>$449.49</strong> ✓</p>
+                        <p><strong>books</strong>: $19.99 (O002) + $25.00 (O004) = <strong>$44.99</strong> ✓</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-red"><i class="fa-solid fa-rotate-right"></i></span> Paso 4: Verificar Exactly-Once</h3>
+                <p>Procedimiento para validar EOS:</p>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <h4>1. Iniciar la aplicación</h4>
+                        <p>Ejecutar el job Kafka Streams y comenzar a procesar eventos.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>2. Matar el proceso mid-processing</h4>
+                        <p>Enviar <code>Ctrl+C</code> o <code>kill -9</code> mientras hay eventos en tránsito.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>3. Reiniciar la aplicación</h4>
+                        <p>Volver a lanzar el job. Kafka Streams restaurará el state store y reanudará desde el último offset commiteado.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>4. Verificar output</h4>
+                        <p>Consumir con <code>--from-beginning</code> y confirmar que <strong>no hay duplicados</strong>: los totales permanecen idénticos.</p>
+                    </div>
+                </div>
+                <div class="callout success">
+                    <div class="callout-icon"><i class="fa-solid fa-check-circle"></i></div>
+                    <div class="callout-content">
+                        <strong>Criterio de éxito</strong>
+                        <p>Después del reinicio, los ingresos totales por categoría deben ser <strong>exactamente los mismos</strong> que antes del fallo. Si hubiera duplicados, veríamos revenue inflado (ej: $449.49 × 2 = $898.98).</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =========================================
+             SECCIÓN 7: RESUMEN
+             ========================================= -->
+        <section class="section" id="resumen">
+            <div class="section-num">07</div>
+            <div class="section-header">
+                <span class="section-tag tag-purple">Síntesis</span>
+                <h2>Resumen y Entregables</h2>
+                <p class="intro">
+                    Los patrones implementados son los mismos que usan DoorDash, Robinhood y Netflix para analytics en tiempo real a escala.
+                </p>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-cyan"><i class="fa-solid fa-star"></i></span> Conceptos Clave Aplicados</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <h4>1. Co-partitioning de topics</h4>
+                        <p>Ambos topics con 8 particiones y misma key (<code>order_id</code>) para que el join distribuido funcione.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>2. Stream-Stream join con ventana</h4>
+                        <p><code>JoinWindows.ofTimeDifferenceWithNoGrace(Duration.ofMinutes(5))</code> cubre delays de pago de hasta 2 min.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>3. Repartition por cambio de key</h4>
+                        <p><code>groupBy(category_id)</code> dispara repartition interno, necesario para agregar correctamente en distributed.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>4. Tumbling windows</h4>
+                        <p>Ventanas de 5 minutos no solapadas, con <code>TimeWindows.ofSizeWithNoGrace</code>.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4>5. Exactly-once semantics</h4>
+                        <p><code>processing.guarantee=exactly_once_v2</code> previene doble conteo de revenue ante fallos.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3><span class="icon icon-green"><i class="fa-solid fa-file-lines"></i></span> Entregables Requeridos</h3>
+                <div class="grid-3">
+                    <div class="metric-card">
+                        <div class="metric-label">Requirement 1</div>
+                        <div class="metric-value val-cyan" style="font-size: 1.1rem;">Source Code</div>
+                        <div class="metric-sub">App + modelos + build</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Requirement 2</div>
+                        <div class="metric-value val-purple" style="font-size: 1.1rem;">Topology + Config</div>
+                        <div class="metric-sub">Diagrama + properties</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Requirement 3</div>
+                        <div class="metric-value val-orange" style="font-size: 1.1rem;">Test Report</div>
+                        <div class="metric-sub">200-300 palabras</div>
+                    </div>
+                </div>
+
+                <h4>Estructura del Test Validation Report</h4>
+                <ul>
+                    <li>Output de muestra del topic <code>category-revenue</code>.</li>
+                    <li>Demostración de agregaciones correctas en ventanas de 5 min.</li>
+                    <li>Explicación de cómo se verificó exactly-once (reinicio mid-processing).</li>
+                    <li>Confirmación de que el join window maneja delays de pago.</li>
+                </ul>
+            </div>
+
+            <div class="glass-card" style="background: linear-gradient(135deg, rgba(0,242,254,0.08), rgba(178,36,239,0.08)); border-color: rgba(0,242,254,0.3);">
+                <h3><span class="icon icon-purple"><i class="fa-solid fa-rocket"></i></span> Próximo Paso</h3>
+                <p style="font-size: 1.05rem; color: var(--text);">
+                    Este laboratorio construye un pipeline Kafka Streams completo que demuestra patrones production-ready. En el Módulo 3 aplicarás estas bases a la optimización de throughput y costos con tiered storage y partition tuning.
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer>
+        <p style="font-size: 1rem; color: var(--text); margin-bottom: 10px;">
+            <i class="fa-solid fa-flask"></i> Hands-On Practice: Design and Implement Order-Payment Join
+        </p>
+        <p style="font-size: 0.85rem;">Kafka Streams · Stream-Stream Join · Windowing · Exactly-Once Semantics</p>
+        <p style="font-size: 0.75rem; margin-top: 15px; color: rgba(148,163,184,0.5);">
+            Basado en el escenario de QuickCommerce · Módulo 2 · Stream & Optimize Real-Time Data Flows
+        </p>
+    </footer>
+
+    <!-- SCRIPTS -->
+    <script>
+        // THREE.JS BACKGROUND
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050914, 0.0025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 15, 90);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const pointLight = new THREE.PointLight(0x00f2fe, 2, 500);
+        scene.add(pointLight);
+        scene.add(new THREE.AmbientLight(0x222222));
+        const fillLight = new THREE.PointLight(0xb224ef, 1, 500);
+        fillLight.position.set(-50, -50, -50);
+        scene.add(fillLight);
+
+        const planetGeo = new THREE.IcosahedronGeometry(12, 32);
+        const planetMat = new THREE.MeshPhongMaterial({
+            color: 0x0a0a1a, emissive: 0x00f2fe, emissiveIntensity: 0.4,
+            wireframe: true, transparent: true, opacity: 0.7
+        });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        scene.add(planet);
+
+        const coreGeo = new THREE.IcosahedronGeometry(11.5, 16);
+        const coreMat = new THREE.MeshStandardMaterial({ color: 0x111122, roughness: 0.3, metalness: 0.8 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(core);
+
+        const ringGeo = new THREE.TorusGeometry(20, 0.08, 16, 100);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, transparent: true, opacity: 0.25 });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        scene.add(ring);
+
+        const particlesGeo = new THREE.BufferGeometry();
+        const particlesCount = 2500;
+        const posArray = new Float32Array(particlesCount * 3);
+        for (let i = 0; i < particlesCount * 3; i += 3) {
+            const r = 30 + Math.random() * 140;
+            const t = Math.random() * Math.PI * 2;
+            const p = Math.acos((Math.random() * 2) - 1);
+            posArray[i] = r * Math.sin(p) * Math.cos(t);
+            posArray[i+1] = r * Math.sin(p) * Math.sin(t);
+            posArray[i+2] = r * Math.cos(p);
+        }
+        particlesGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particlesMat = new THREE.PointsMaterial({
+            size: 0.7, color: 0x00f2fe, transparent: true, opacity: 0.5,
+            blending: THREE.AdditiveBlending
+        });
+        const particlesMesh = new THREE.Points(particlesGeo, particlesMat);
+        scene.add(particlesMesh);
+
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+            planet.rotation.y += 0.0015;
+            core.rotation.y -= 0.0008;
+            ring.rotation.z += 0.004;
+            particlesMesh.rotation.y = t * 0.03;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // GSAP
+        gsap.registerPlugin(ScrollTrigger);
+
+        gsap.utils.toArray('.section').forEach(section => {
+            gsap.to(section, {
+                scrollTrigger: {
+                    trigger: section,
+                    start: "top 85%",
+                    toggleActions: "play none none none"
+                },
+                opacity: 1,
+                y: 0,
+                duration: 1.2,
+                ease: "power3.out"
+            });
+        });
+
+        gsap.to(".hero h1", {
+            scrollTrigger: {
+                trigger: ".hero",
+                start: "top top",
+                end: "bottom top",
+                scrub: true
+            },
+            scale: 0.85,
+            opacity: 0,
+            y: 80
+        });
+
+        gsap.utils.toArray('.bar-fill').forEach(bar => {
+            const finalWidth = bar.style.width;
+            bar.style.width = '0%';
+            gsap.to(bar, {
+                scrollTrigger: {
+                    trigger: bar,
+                    start: "top 90%"
+                },
+                width: finalWidth,
+                duration: 1.5,
+                ease: "power2.out"
+            });
+        });
+
+        // PROGRESS BAR
+        const progressBar = document.getElementById('progress-bar');
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollPercent = (scrollTop / docHeight) * 100;
+            progressBar.style.width = scrollPercent + '%';
+        });
+
+        // NAV DOTS
+        const dots = document.querySelectorAll('.nav-dot');
+        const sections = document.querySelectorAll('section[id]');
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const target = document.getElementById(dot.dataset.target);
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        const observerOptions = {
+            root: null,
+            rootMargin: '-40% 0px -55% 0px',
+            threshold: 0
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    dots.forEach(d => {
+                        d.classList.toggle('active', d.dataset.target === id);
+                    });
+                }
+            });
+        }, observerOptions);
+
+        sections.forEach(section => observer.observe(section));
+
+        // SMOOTH SCROLL TOC
+        document.querySelectorAll('.toc ol li a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                if (target) {
+                    window.scrollTo({
+                        top: target.offsetTop - 40,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
