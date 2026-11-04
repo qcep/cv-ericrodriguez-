@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen Detallado Proyectos Eric Rodriguez de Data Pipeline en GCP</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --panel-2: #334155;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --gcp-blue: #4285f4;
+            --gcp-yellow: #fbbc04;
+            --gcp-green: #34a853;
+            --gcp-red: #ea4335;
+            --beam: #ff6d00;
+            --pubsub: #7c3aed;
+            --bigquery: #4285f4;
+            --datafusion: #ff6d00;
+            --kafka: #f97316;
+            --bigtable: #4285f4;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            max-width: 1000px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 300;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--accent), var(--gcp-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 1rem;
+        }
+
+        .subtitle code {
+            color: var(--gcp-yellow);
+            background: var(--panel);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: 2px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent);
+        }
+
+        .btn.active {
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.15);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            width: 100%;
+            max-width: 1600px;
+            align-items: start;
+        }
+
+        .labs-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .lab-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+            display: none;
+        }
+
+        .lab-card.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .lab-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .lab-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .lab-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .lab-tag {
+            margin-left: auto;
+            font-size: 0.7rem;
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: var(--panel-2);
+            color: var(--muted);
+            font-family: monospace;
+        }
+
+        .lab-section {
+            margin-bottom: 20px;
+        }
+
+        .lab-section h3 {
+            font-size: 0.9rem;
+            color: var(--accent);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .lab-section p {
+            font-size: 0.9rem;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
+        .steps-list {
+            list-style: none;
+            padding: 0;
+            counter-reset: step;
+        }
+
+        .steps-list li {
+            position: relative;
+            padding: 10px 10px 10px 45px;
+            margin-bottom: 8px;
+            background: var(--panel-2);
+            border-radius: 8px;
+            font-size: 0.88rem;
+            border-left: 3px solid var(--accent);
+            counter-increment: step;
+        }
+
+        .steps-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.75rem;
+        }
+
+        .steps-list li code {
+            color: var(--gcp-yellow);
+            background: rgba(0,0,0,0.3);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 0.82rem;
+        }
+
+        .concept-box {
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin: 12px 0;
+            font-size: 0.85rem;
+        }
+
+        .concept-box strong {
+            color: var(--accent);
+        }
+
+        .concept-box i {
+            color: var(--gcp-yellow);
+            margin-right: 6px;
+        }
+
+        .result-box {
+            background: rgba(52, 168, 83, 0.08);
+            border: 1px solid rgba(52, 168, 83, 0.3);
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin: 12px 0;
+            font-size: 0.85rem;
+        }
+
+        .result-box strong {
+            color: var(--gcp-green);
+        }
+
+        .result-box i {
+            color: var(--gcp-green);
+            margin-right: 6px;
+        }
+
+        .sidebar {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--muted);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.82rem;
+            border: 1px solid transparent;
+        }
+
+        .sidebar-item:hover {
+            background: var(--panel-2);
+        }
+
+        .sidebar-item.active {
+            background: rgba(56, 189, 248, 0.12);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .sidebar-item .num {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--panel-2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .sidebar-item.active .num {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        .sidebar-item.completed .num {
+            background: var(--gcp-green);
+            color: var(--bg);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 1100px) {
+            .workspace { grid-template-columns: 1fr; }
+            .sidebar { position: static; max-height: none; }
+        }
+
+        .summary-banner {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(52, 168, 83, 0.15));
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 1600px;
+            text-align: center;
+        }
+
+        .summary-banner h2 {
+            font-size: 1.3rem;
+            font-weight: 400;
+            margin-bottom: 10px;
+        }
+
+        .summary-banner p {
+            color: var(--muted);
+            font-size: 0.9rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .badge-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--panel-2);
+            color: var(--muted);
+        }
+
+        .badge i {
+            font-size: 0.8rem;
+        }
+
+        .badge.beam { color: var(--beam); }
+        .badge.pubsub { color: var(--pubsub); }
+        .badge.bigquery { color: var(--bigquery); }
+        .badge.datafusion { color: var(--datafusion); }
+        .badge.kafka { color: var(--kafka); }
+        .badge.bigtable { color: var(--bigtable); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Resumen Detallado Proyectos Eric Rodriguez de Data Pipeline en GCP</h1>
+        <p class="subtitle">14 proyectos · Dataflow · Pub/Sub · BigQuery · Data Fusion · Kafka · Bigtable · Beam</p>
+    </header>
+
+    <div class="summary-banner">
+        <h2>Implementación de pipelines de datos en Google Cloud</h2>
+        <p>
+            Este resumen cubre la ejecución completa de 14 proyectos prácticos implementados en entornos reales. Abarca desde la creación de recursos básicos (buckets, datasets, topics) hasta la construcción de pipelines ETL/ELT complejos con Apache Beam, Dataflow, Cloud Data Fusion, Kafka y Bigtable. Cada proyecto se explica con los pasos ejecutados, los conceptos técnicos clave y el resultado final obtenido.
+        </p>
+        <div class="badge-row">
+            <span class="badge beam"><i class="fa-solid fa-fire"></i> Apache Beam</span>
+            <span class="badge pubsub"><i class="fa-solid fa-tower-broadcast"></i> Pub/Sub</span>
+            <span class="badge bigquery"><i class="fa-solid fa-database"></i> BigQuery</span>
+            <span class="badge datafusion"><i class="fa-solid fa-diagram-project"></i> Data Fusion</span>
+            <span class="badge kafka"><i class="fa-solid fa-stream"></i> Kafka</span>
+            <span class="badge bigtable"><i class="fa-solid fa-table-cells"></i> Bigtable</span>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div class="labs-container" id="labsContainer">
+
+            <!-- PROYECTO 01 -->
+            <div class="lab-card active" id="lab01">
+                <div class="lab-header">
+                    <div class="lab-number">1</div>
+                    <div class="lab-title">Dataflow Qwik Start - Python</div>
+                    <div class="lab-tag">GSP207</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Ejecutar un pipeline de Apache Beam en Python usando Dataflow para contar palabras (WordCount) de un texto de Shakespeare y almacenar los resultados en Cloud Storage.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se configuró la región <code>asia-southeast1</code> y se habilitó la API de Dataflow.</li>
+                        <li>Se creó un bucket de Cloud Storage (<code>qwiklabs-gcp-02-...-bucket</code>) para almacenar resultados y archivos temporales.</li>
+                        <li>Se lanzó un contenedor Docker con Python 3.12: <code>docker run -it python:3.12 /bin/bash</code>.</li>
+                        <li>Dentro del contenedor se instaló el SDK de Apache Beam: <code>pip install apache-beam[gcp]==2.67.0</code>.</li>
+                        <li>Se ejecutó el pipeline localmente con DirectRunner para validar: <code>python -m apache_beam.examples.wordcount --output OUTPUT_FILE</code>.</li>
+                        <li>Se ejecutó el pipeline en Dataflow remotamente con <code>DataflowRunner</code>, especificando <code>--staging_location</code>, <code>--temp_location</code> y <code>--output</code> en el bucket.</li>
+                        <li>Se verificó el job en la consola de Dataflow (estado Succeeded) y se revisaron los archivos de salida en Cloud Storage.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Dataflow es el servicio gestionado de Google Cloud para ejecutar pipelines de Apache Beam. El SDK de Beam permite escribir pipelines en Python/Java que se ejecutan localmente (DirectRunner) o en la nube (DataflowRunner). El parámetro <code>temp_location</code> debe ser una URL válida de Cloud Storage (<code>gs://...</code>).
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Job <code>wordcount</code> ejecutado exitosamente. Se generaron archivos <code>output-00000-of-00001</code> en <code>gs://bucket/results/</code> con el conteo de palabras del texto de Shakespeare.
+                </div>
+            </div>
+
+            <!-- PROYECTO 02 -->
+            <div class="lab-card" id="lab02">
+                <div class="lab-header">
+                    <div class="lab-number">2</div>
+                    <div class="lab-title">Dataflow Qwik Start - Templates</div>
+                    <div class="lab-tag">GSP192</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Usar una plantilla predefinida de Dataflow (<code>PubSub_to_BigQuery</code>) para crear un pipeline de streaming que lea datos de Pub/Sub y los escriba en BigQuery.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se re-habilitó la API de Dataflow (deshabilitarla y habilitarla de nuevo).</li>
+                        <li>Se creó un dataset en BigQuery llamado <code>taxirides</code> y una tabla <code>realtime</code> con un esquema específico (ride_id, point_idx, latitude, longitude, timestamp, meter_reading, etc.).</li>
+                        <li>Se creó un bucket de Cloud Storage para archivos temporales del job.</li>
+                        <li>Se lanzó la plantilla <code>PubSub_to_BigQuery</code> usando <code>gcloud dataflow jobs run iotflow</code> con los parámetros: topic de entrada (<code>projects/pubsub-public-data/topics/taxirides-realtime</code>) y tabla de salida (<code>proyecto:taxirides.realtime</code>).</li>
+                        <li>Se verificó que el job estuviera en estado "Running" (streaming).</li>
+                        <li>Se ejecutó una consulta SQL en BigQuery para verificar que los datos de taxis estaban llegando a la tabla <code>raw_events</code>.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Las plantillas de Dataflow son pipelines predefinidos que se pueden lanzar sin escribir código. La plantilla <code>PubSub_to_BigQuery</code> es ideal para streaming: lee mensajes JSON de un topic de Pub/Sub y los inserta en una tabla de BigQuery. Dataflow soporta tanto batch como streaming.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Job <code>iotflow</code> ejecutándose en streaming. Datos de taxis fluyendo de Pub/Sub a BigQuery en tiempo real. Consulta SQL devolvió 1000 filas de ejemplo.
+                </div>
+            </div>
+
+            <!-- PROYECTO 03 -->
+            <div class="lab-card" id="lab03">
+                <div class="lab-header">
+                    <div class="lab-number">3</div>
+                    <div class="lab-title">Validate Data Quality for a Batch Data Pipeline using Serverless for Apache Spark</div>
+                    <div class="lab-tag">Intermediate</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Construir un pipeline batch con PySpark (Serverless Spark) que valide la calidad de datos de un CSV de clientes, separe registros válidos (a BigQuery) e inválidos (a una DLQ en Cloud Storage).</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se exploró el entorno provisionado por Terraform: VPC, subnet, buckets (main y DLQ), y archivo CSV de 1000 registros con ~20% de datos inválidos (IDs nulos, emails malformados).</li>
+                        <li>Se creó un dataset en BigQuery llamado <code>customer_data_clean</code> para almacenar los datos limpios.</li>
+                        <li>Se escribió un script PySpark (<code>customer_dq.py</code>) que: lee el CSV desde GCS, aplica reglas de calidad (ID no nulo y email con formato válido usando regex), separa el DataFrame en <code>clean_df</code> y <code>error_df</code>, escribe los limpios en BigQuery y los inválidos en la DLQ (GCS).</li>
+                        <li>Se subió el script a Cloud Storage y se ejecutó un batch job con <code>gcloud dataproc batches submit pyspark</code>, especificando la subnet, región, bucket de dependencias y el script.</li>
+                        <li>Se verificó en BigQuery que la tabla <code>valid_customers</code> tenía ~798 registros limpios.</li>
+                        <li>Se revisó la DLQ en GCS para confirmar que los ~200 registros inválidos se guardaron correctamente.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Serverless Spark en Dataproc permite ejecutar jobs de Spark sin gestionar un clúster. La validación de calidad de datos (DQ) es fundamental en pipelines ETL: se aplican reglas (ej. regex para emails, campos no nulos) y se separan los registros que no cumplen para su análisis posterior en una Dead Letter Queue (DLQ).
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Batch job <code>customer-dq-job</code> exitoso. ~800 registros limpios en BigQuery (<code>customer_data_clean.valid_customers</code>) y ~200 registros inválidos en <code>gs://...-dlq-bucket/errors/</code>.
+                </div>
+            </div>
+
+            <!-- PROYECTO 04 -->
+            <div class="lab-card" id="lab04">
+                <div class="lab-header">
+                    <div class="lab-number">4</div>
+                    <div class="lab-title">Building Batch Pipelines in Cloud Data Fusion</div>
+                    <div class="lab-tag">GSP807</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Usar Cloud Data Fusion (CDF) para construir un pipeline ETL visual que cargue un CSV (titanic.csv) desde GCS, lo transforme con Wrangler y lo escriba en BigQuery.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se creó un bucket y se subió <code>titanic.csv</code> (893 registros) desde un bucket público de Google.</li>
+                        <li>Se otorgaron permisos IAM a la instancia de CDF: roles <code>Cloud Data Fusion API Service Agent</code>, <code>Dataproc Administrator</code> y <code>Service Account User</code>.</li>
+                        <li>Se abrió la UI de CDF y se usó Wrangler para transformar el CSV: directiva <code>parse-as-csv :body ',' true</code> para parsear el CSV y <code>drop :body</code> para eliminar la columna raw.</li>
+                        <li>Se creó un pipeline batch en Pipeline Studio con 3 nodos: GCSFile (source) → Wrangler (transform) → BigQuery (sink).</li>
+                        <li>Se configuraron las propiedades del nodo BigQuery: dataset <code>demo</code>, tabla <code>titanic</code>.</li>
+                        <li>Se guardó y desplegó el pipeline (<code>ETL-batch-pipeline</code>), se ejecutó y se verificó que 892 registros se cargaron en <code>demo.titanic</code>.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Cloud Data Fusion es una plataforma visual de integración de datos basada en CDAP. Wrangler permite transformar datos de forma interactiva con directivas (como <code>parse-as-csv</code> y <code>drop</code>). Pipeline Studio permite diseñar pipelines ETL arrastrando y soltando nodos (source, transform, sink).
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline ETL ejecutado con éxito. 892 registros del Titanic cargados en BigQuery (<code>demo.titanic</code>).
+                </div>
+            </div>
+
+            <!-- PROYECTO 05 -->
+            <div class="lab-card" id="lab05">
+                <div class="lab-header">
+                    <div class="lab-number">5</div>
+                    <div class="lab-title">ETL Processing on Google Cloud Using Dataflow and BigQuery (Python)</div>
+                    <div class="lab-tag">GSP290</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Ejecutar 4 pipelines ETL con Apache Beam en Python: ingesta, transformación, enriquecimiento y join (data lake a data mart), usando Dataflow y BigQuery.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se re-habilitó la API de Dataflow.</li>
+                        <li>Se descargó el repositorio de código <code>dataflow-python-examples</code> desde GCS.</li>
+                        <li>Se creó un bucket, se copiaron los archivos <code>usa_names.csv</code> y <code>head_usa_names.csv</code>, y se creó el dataset <code>lake</code> en BigQuery.</li>
+                        <li>Se lanzó un contenedor Docker con Python 3.8 y se instaló <code>apache-beam[gcp]==2.59.0</code>.</li>
+                        <li><strong>Pipeline 1 - Ingesta:</strong> <code>data_ingestion.py</code> leyó el CSV de GCS, filtró el header y escribió en <code>lake.usa_names</code>.</li>
+                        <li><strong>Pipeline 2 - Transformación:</strong> <code>data_transformation.py</code> transformó el año a tipo DATE y escribió en <code>lake.usa_names_transformed</code>.</li>
+                        <li><strong>Pipeline 3 - Enriquecimiento:</strong> <code>data_enrichment.py</code> aplicó lógica custom (se editó la línea 83 para usar <code>x</code> en lugar de <code>x.decode("utf8")</code>) y escribió en <code>lake.usa_names_enriched</code>.</li>
+                        <li><strong>Pipeline 4 - Join:</strong> <code>data_lake_to_mart.py</code> leyó dos tablas de BigQuery (<code>lake.orders</code> y <code>lake.customers</code>), hizo un join con side input y escribió en <code>lake.orders_denormalized_sideinput</code>.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> ETL (Extract, Transform, Load) es el patrón clásico de integración de datos. Apache Beam permite escribir pipelines que se ejecutan en Dataflow. Los side inputs permiten hacer joins en pipelines de streaming/batch. Cada pipeline es independiente y escribe en una tabla diferente del dataset <code>lake</code>.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> 4 pipelines ejecutados exitosamente. Tablas creadas en <code>lake</code>: <code>usa_names</code>, <code>usa_names_transformed</code>, <code>usa_names_enriched</code>, <code>orders_denormalized_sideinput</code>.
+                </div>
+            </div>
+
+            <!-- PROYECTO 06 -->
+            <div class="lab-card" id="lab06">
+                <div class="lab-header">
+                    <div class="lab-number">6</div>
+                    <div class="lab-title">Getting Started with Cloud Data Fusion</div>
+                    <div class="lab-tag">OCBL161</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Crear una instancia de Cloud Data Fusion, desplegar un pipeline de ejemplo desde el Hub y ejecutarlo para cargar datos JSON en BigQuery.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se habilitó la API de Cloud Data Fusion (deshabilitar y habilitar).</li>
+                        <li>Se creó una instancia de CDF (<code>cdf-lab-instance</code>) en <code>us-central1</code>, edición Basic, versión 6.10.1.</li>
+                        <li>Se otorgó el rol <code>Cloud Data Fusion API Service Agent</code> a la cuenta de servicio de Managed Spark.</li>
+                        <li>Se navegó la UI de CDF y se accedió al Hub.</li>
+                        <li>Se seleccionó el pipeline de ejemplo <code>Cloud Data Fusion Quickstart</code> y se creó.</li>
+                        <li>Se personalizó el pipeline en Pipeline Studio: GCS JSON → Wrangler → Filter → BigQuery.</li>
+                        <li>Se desplegó y ejecutó el pipeline. Se provisionó un clúster efímero de Spark, se procesaron los datos y se escribieron 42 registros en <code>GCPQuickstart.top_rated_inexpensive</code>.</li>
+                        <li>Se verificaron los resultados en BigQuery.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> El Hub de CDF ofrece pipelines preconstruidos y conectores. Al ejecutar un pipeline, CDF provisiona un clúster efímero de Dataproc (Managed Service for Spark) que se elimina al terminar. Esto permite ejecutar transformaciones complejas sin gestionar infraestructura.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline Quickstart ejecutado. 42 registros en <code>GCPQuickstart.top_rated_inexpensive</code>. Clúster efímero eliminado automáticamente.
+                </div>
+            </div>
+
+            <!-- PROYECTO 07 -->
+            <div class="lab-card" id="lab07">
+                <div class="lab-header">
+                    <div class="lab-number">7</div>
+                    <div class="lab-title">Building Transformations and Preparing Data with Wrangler in Cloud Data Fusion</div>
+                    <div class="lab-tag">OCBL163</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Usar Wrangler en CDF para aplicar transformaciones avanzadas a un CSV (titanic.csv) usando directivas CLI, y luego cargar los datos transformados en BigQuery.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se otorgaron permisos IAM: <code>Cloud Data Fusion API Service Agent</code>, <code>Managed Service for Spark Administrator</code> y <code>Service Account User</code>.</li>
+                        <li>Se creó un bucket y se subió <code>titanic.csv</code> (893 registros).</li>
+                        <li>Se abrió la UI de CDF y se accedió a Wrangler.</li>
+                        <li>Se aplicaron directivas iniciales: <code>parse-as-csv :body ',' true</code> y <code>drop :body</code>.</li>
+                        <li>Se aplicaron 20 directivas CLI adicionales, incluyendo: <code>fill-null-or-empty :Cabin 'none'</code>, <code>send-to-error empty(Age)</code>, <code>parse-as-csv :Name ',' false</code> (para separar nombre y apellido), <code>set-type :Age integer</code>, <code>set-column Today_Fare (Fare * 23.4058)+1</code> (inflación), <code>generate-uuid id</code>, <code>mask-shuffle First_Name</code> (enmascarar PII).</li>
+                        <li>Se descargó la receta de directivas y se aplicó al nodo Wrangler en Pipeline Studio.</li>
+                        <li>Se creó el dataset <code>demo_cdf</code> en BigQuery y se configuró el sink para escribir en <code>demo_cdf.titanic</code>.</li>
+                        <li>Se desplegó y ejecutó el pipeline. 892 registros se cargaron en BigQuery.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Wrangler permite transformar datos de forma interactiva. Las directivas son comandos que se aplican secuencialmente. Algunas útiles: <code>parse-as-csv</code> (parsear CSV), <code>set-type</code> (cambiar tipo), <code>send-to-error</code> (validación), <code>mask-shuffle</code> (enmascarar PII), <code>generate-uuid</code> (generar ID único).
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline <code>DemoBQ</code> ejecutado. 892 registros transformados cargados en <code>demo_cdf.titanic</code>. Se aplicaron 22 directivas en total.
+                </div>
+            </div>
+
+            <!-- PROYECTO 08 -->
+            <div class="lab-card" id="lab08">
+                <div class="lab-header">
+                    <div class="lab-number">8</div>
+                    <div class="lab-title">Building Batch Pipelines in Cloud Data Fusion (GSP807 / OCBL162)</div>
+                    <div class="lab-tag">GSP807</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Repetir el flujo completo de construcción de un pipeline batch en CDF: cargar CSV, transformar con Wrangler, configurar sink BigQuery, probar y desplegar.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se creó un bucket y se subió <code>titanic.csv</code> (893 registros).</li>
+                        <li>Se otorgaron permisos IAM a la instancia de CDF.</li>
+                        <li>Se usó Wrangler para aplicar 2 directivas: <code>parse-as-csv :body ',' true</code> y <code>drop :body</code>.</li>
+                        <li>Se construyó el pipeline en Pipeline Studio: GCSFile → Wrangler → BigQuery.</li>
+                        <li>Se configuraron las propiedades del nodo BigQuery: Reference Name <code>Titanic_BQ</code>, Dataset <code>demo</code>, Table <code>titanic</code>.</li>
+                        <li>Se guardó el pipeline como <code>ETL-batch-pipeline</code>, se previsualizó (Preview mode) y se desplegó.</li>
+                        <li>Se ejecutó el pipeline y se verificó que 892 registros se escribieron en <code>demo.titanic</code>.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> El flujo de trabajo en CDF es: Wrangler (transformación) → Pipeline Studio (diseño) → Preview (validación) → Deploy (despliegue) → Run (ejecución). El Preview mode permite validar la lógica antes de ejecutar el job completo, ahorrando tiempo y recursos.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline ETL completo y validado. 892 registros en <code>demo.titanic</code>. Pipeline reutilizable para futuras ejecuciones.
+                </div>
+            </div>
+
+            <!-- PROYECTO 09 -->
+            <div class="lab-card" id="lab09">
+                <div class="lab-header">
+                    <div class="lab-number">9</div>
+                    <div class="lab-title">Building Realtime Pipelines in Cloud Data Fusion</div>
+                    <div class="lab-tag">GSP808 / OCBL164</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Construir un pipeline de streaming en CDF que lea mensajes de Pub/Sub (tweets JSON), los transforme con Wrangler y los escriba en BigQuery en tiempo real.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se verificaron permisos del proyecto y se re-habilitó la API de Dataflow.</li>
+                        <li>Se creó un bucket y se subió un archivo de tweets JSON (<code>pubnub_tweets_2019-06-09</code>).</li>
+                        <li>Se creó un topic de Pub/Sub (<code>cdf_lab_topic</code>) y una subscription (<code>cdf_lab_subscription</code>).</li>
+                        <li>Se otorgaron permisos IAM: <code>CDF API Service Agent</code>, <code>Managed Service for Spark Administrator</code> y <code>Service Account User</code>.</li>
+                        <li>Se abrió la UI de CDF y se creó un pipeline realtime.</li>
+                        <li>Se usó Wrangler para aplicar 19 directivas, incluyendo: <code>parse-as-json :body 1</code> (parsear JSON), <code>parse-as-simple-date :created_at EEE MMM dd HH:mm:ss Z yyyy</code> (parsear fecha de Twitter), <code>drop</code> de columnas irrelevantes, <code>set-type :possibly_sensitive boolean</code>.</li>
+                        <li>Se añadieron directivas al top: <code>keep :message</code>, <code>set-charset :message 'utf-8'</code>, <code>rename :message :body</code> (para compatibilidad entre Pub/Sub y Wrangler).</li>
+                        <li>Se configuró el pipeline: PubSub (source) → Wrangler (transform) → BigQuery (sink, tabla <code>realtime.tweets</code>).</li>
+                        <li>Se desplegó y ejecutó el pipeline en modo streaming.</li>
+                        <li>Se lanzó un job de Dataflow con la plantilla <code>Text Files on Cloud Storage to Pub/Sub</code> para enviar los tweets del archivo al topic.</li>
+                        <li>Se verificaron las métricas: ~500 eventos procesados de Pub/Sub a BigQuery.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Los pipelines realtime en CDF se ejecutan en un clúster de Spark Streaming. A diferencia de los batch, no terminan: quedan corriendo continuamente procesando eventos. La integración con Pub/Sub permite ingestar datos en tiempo real. Wrangler puede parsear JSON anidado con <code>parse-as-json</code>.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline <code>Realtime_Pipeline</code> corriendo. Eventos de tweets fluyendo de Pub/Sub a BigQuery (<code>realtime.tweets</code>) en tiempo real. ~500 eventos procesados.
+                </div>
+            </div>
+
+            <!-- PROYECTO 10 -->
+            <div class="lab-card" id="lab10">
+                <div class="lab-header">
+                    <div class="lab-number">10</div>
+                    <div class="lab-title">Apache Beam + Bigtable Enrich esports DLC Data</div>
+                    <div class="lab-tag">GSP1345</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Construir un pipeline de Dataflow que enriquece datos de compras de DLC de esports usando Bigtable, aplica un modelo de PyTorch para generar recomendaciones y emite los resultados.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se crearon recursos: instancia de Bigtable (<code>instance</code> con cluster <code>my-cluster</code>), topic de Pub/Sub (<code>customer-data</code>) y subscription (<code>customer-data_sub</code>).</li>
+                        <li>Se abrió un notebook de Workbench (JupyterLab) con kernel Python 3.</li>
+                        <li>Se instalaron paquetes: <code>pip install torch apache-beam[gcp]</code>.</li>
+                        <li>Se configuraron variables: <code>PROJECT_ID</code>, <code>INSTANCE_ID</code>, <code>TABLE_ID</code>.</li>
+                        <li>Se entrenó un modelo PyTorch (<code>DLCRecommender</code>) con 10 epochs, logrando una accuracy del 94.2%.</li>
+                        <li>Se creó una tabla en Bigtable (<code>customer_data</code>) con 3 column families: <code>customer_info</code>, <code>purchase_history</code>, <code>demographics</code>. Se insertaron 5 filas de ejemplo.</li>
+                        <li>Se publicaron mensajes de compra a Pub/Sub.</li>
+                        <li>Se configuró un <code>BigtableEnrichmentHandler</code> para enriquecer los mensajes de Pub/Sub con datos de Bigtable usando <code>player_id</code> como row key.</li>
+                        <li>Se configuró un <code>PyTorchModelHandlerTensor</code> para cargar el modelo entrenado y hacer inferencia.</li>
+                        <li>Se construyó el pipeline: Pub/Sub → Bigtable Enrichment → PyTorch Inference → Top-3 Recommendations.</li>
+                        <li>Se ejecutó el pipeline en Dataflow y se generaron recomendaciones para <code>player_4521</code>: DLC_Pack_Beta (0.92), DLC_Pack_Gamma (0.87), DLC_Pack_Delta (0.81).</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Bigtable es una base de datos NoSQL de baja latencia ideal para enriquecimiento en tiempo real. Apache Beam permite integrar modelos de ML (PyTorch) en pipelines de datos usando <code>RunInference</code>. El enriquecimiento combina datos de streaming (Pub/Sub) con datos de referencia (Bigtable) para generar recomendaciones personalizadas.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline ejecutado. Modelo PyTorch entrenado (94.2% accuracy). Recomendaciones top-3 generadas para <code>player_4521</code>. Pipeline: Pub/Sub → Bigtable → PyTorch → Recomendaciones.
+                </div>
+            </div>
+
+            <!-- PROYECTO 11 -->
+            <div class="lab-card" id="lab11">
+                <div class="lab-header">
+                    <div class="lab-number">11</div>
+                    <div class="lab-title">Stream E-sports Data with Pub/Sub and BigQuery</div>
+                    <div class="lab-tag">GSP1342</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Simular datos de e-sports (Galactic Grand Prix) con un script Python, publicarlos en Pub/Sub, escribirlos en BigQuery y crear leaderboards (vistas) de jugadores y equipos.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se configuraron variables de entorno: <code>PROJECT_ID</code> y <code>BUCKET_NAME</code>.</li>
+                        <li>Se creó un dataset en BigQuery (<code>esports_analytics</code>) y una tabla (<code>raw_events</code>) con 11 columnas (event_id, match_id, event_type, winner_player_id, winner_team_id, timestamp, etc.).</li>
+                        <li>Se creó un topic de Pub/Sub (<code>esports_events_topic</code>) y una subscription (<code>esports_events_topic-sub</code>).</li>
+                        <li>Se configuró la subscription para escribir a BigQuery (<code>esports_analytics.raw_events</code>) usando el esquema de la tabla.</li>
+                        <li>Se otorgó el rol <code>Pub/Sub Publisher</code> a la cuenta de servicio de Compute Engine.</li>
+                        <li>Se descargó el script <code>esports-simulation.py</code> y se configuró con el <code>PROJECT_ID</code> correcto.</li>
+                        <li>Se instalaron dependencias (<code>google-cloud-pubsub</code>) y se ejecutó el script, que publica eventos cada segundo.</li>
+                        <li>Se verificó que los eventos llegaban a BigQuery (<code>raw_events</code>).</li>
+                        <li>Se crearon dos vistas SQL: <code>player_leaderboard_live</code> (ranking de jugadores por total_score) y <code>team_leaderboard_live</code> (ranking de equipos por total_wins).</li>
+                        <li>Se verificaron los leaderboards: 12 jugadores y 4 equipos en los rankings.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> La integración nativa entre Pub/Sub y BigQuery permite escribir mensajes directamente en tablas sin necesidad de un pipeline de Dataflow. Las vistas materializadas (o vistas regulares) en BigQuery permiten crear leaderboards en tiempo real. El script Python simula una fuente de datos continua.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline streaming: Python → Pub/Sub → BigQuery. 892 eventos en <code>raw_events</code>. Leaderboards creados: 12 jugadores y 4 equipos.
+                </div>
+            </div>
+
+            <!-- PROYECTO 12 -->
+            <div class="lab-card" id="lab12">
+                <div class="lab-header">
+                    <div class="lab-number">12</div>
+                    <div class="lab-title">Stream Processing with Pub/Sub and Dataflow: Qwik Start</div>
+                    <div class="lab-tag">GSP903</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Construir un pipeline de streaming con Apache Beam (Java o Python) que lea mensajes de Pub/Sub, los agrupe en ventanas de tiempo fijo (FixedWindows de 2 minutos) y escriba un archivo por ventana en Cloud Storage.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se configuró la región <code>us-central1</code> y se habilitó la API de Dataflow.</li>
+                        <li>Se crearon variables: <code>PROJECT_ID</code>, <code>BUCKET_NAME</code>, <code>TOPIC_ID=my-id</code>.</li>
+                        <li>Se creó un bucket, un topic de Pub/Sub (<code>my-id</code>), una app de App Engine y un job de Cloud Scheduler (<code>publisher-job</code>) que publica "Hello!" cada minuto.</li>
+                        <li>Se clonó el repositorio <code>java-docs-samples</code> y se revisó el código <code>PubSubToGcs.java</code>.</li>
+                        <li>El pipeline: <code>PubsubIO.readStrings().fromTopic()</code> → <code>Window.into(FixedWindows.of(Duration.standardMinutes(2)))</code> → <code>WriteOneFilePerWindow</code>.</li>
+                        <li>Se compiló y ejecutó el pipeline con Maven y <code>DataflowRunner</code>, especificando <code>--windowSize=2</code>.</li>
+                        <li>Se observó el job en Dataflow: workers iniciados, pipeline corriendo, ventanas de 2 minutos disparando.</li>
+                        <li>Se verificaron los archivos en GCS: <code>output-{HH:MM}-{HH:MM}-0-of-1</code> (un archivo por ventana).</li>
+                        <li>Se realizó el cleanup: eliminar Scheduler job, detener Dataflow job, eliminar topic, archivos y bucket.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Las ventanas (windows) en Beam permiten agrupar datos de streaming en intervalos de tiempo. <code>FixedWindows</code> divide el stream en ventanas de tamaño fijo (ej. 2 minutos). <code>WriteOneFilePerWindow</code> es un sink que escribe un archivo por cada ventana. Cloud Scheduler permite generar tráfico periódico a Pub/Sub.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Pipeline <code>pubsubtogcs</code> ejecutado. Archivos de salida en <code>gs://bucket/samples/output-*</code> (4 archivos de ~2 KiB cada uno). Cleanup completo de recursos.
+                </div>
+            </div>
+
+            <!-- PROYECTO 13 -->
+            <div class="lab-card" id="lab13">
+                <div class="lab-header">
+                    <div class="lab-number">13</div>
+                    <div class="lab-title">Creating a Streaming Data Pipeline with Apache Kafka</div>
+                    <div class="lab-tag">GSP730</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Desplegar un cluster de Apache Kafka en una VM de Compute Engine, crear topics, producir mensajes, ejecutar una aplicación de Kafka Streams (WordCount) y consumir los resultados.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se creó una regla de firewall (<code>allow-iap-ssh</code>) para permitir SSH a través de Identity-Aware Proxy.</li>
+                        <li>Se desplegó una VM (<code>kafka-1-vm</code>, e2-medium) desde Marketplace con Apache Kafka Server on Ubuntu 24.04.</li>
+                        <li>Se añadió el tag <code>iap-gce</code> a la VM para permitir SSH.</li>
+                        <li>Se accedió por SSH a la VM y se arrancó Kafka: <code>cd /opt/kafka/</code>, <code>bin/kafka-storage.sh format</code>, <code>bin/kafka-server-start.sh config/server.properties</code>.</li>
+                        <li>Se crearon dos topics: <code>streams-plaintext-input</code> y <code>streams-wordcount-output</code>.</li>
+                        <li>Se creó un archivo <code>/tmp/file-input.txt</code> con 3 líneas de texto y se enviaron al topic de entrada con <code>kafka-console-producer.sh</code>.</li>
+                        <li>Se ejecutó la aplicación <code>WordCountDemo</code> (Kafka Streams) que lee del topic de entrada, cuenta palabras y escribe en el topic de salida.</li>
+                        <li>Se consumieron los resultados con <code>kafka-console-consumer.sh</code>: se observó el changelog stream con los conteos actualizados (ej. kafka: 1→2→3).</li>
+                        <li>Se detuvo el cluster: Ctrl+C en el broker, consumer y app. Opcionalmente se eliminó la VM.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Kafka es una plataforma de streaming distribuida. Los topics son categorías de mensajes. Los producers escriben y los consumers leen. Kafka Streams es una librería para procesar streams en tiempo real (ej. WordCount). El output es un changelog stream: cada actualización de conteo se emite como un nuevo mensaje.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> Cluster Kafka funcionando. WordCount ejecutado: <code>kafka=3</code>, <code>streams=2</code>, <code>all=1</code>, <code>lead=1</code>, <code>to=1</code>, <code>hello=1</code>, <code>join=1</code>, <code>summit=1</code>. Cluster detenido correctamente.
+                </div>
+            </div>
+
+            <!-- PROYECTO 14 -->
+            <div class="lab-card" id="lab14">
+                <div class="lab-header">
+                    <div class="lab-number">14</div>
+                    <div class="lab-title">Setup IAM and Networking for your Dataflow Jobs</div>
+                    <div class="lab-tag">GSP1134</div>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-bullseye"></i> Objetivo</h3>
+                    <p>Configurar roles IAM y redes (Private Google Access) para ejecutar jobs de Dataflow con IPs privadas, entendiendo los errores de permisos y conectividad.</p>
+                </div>
+                <div class="lab-section">
+                    <h3><i class="fa-solid fa-shoe-prints"></i> Pasos ejecutados</h3>
+                    <ol class="steps-list">
+                        <li>Se creó un bucket en Cloud Storage (<code>gs://PROJECT_ID</code>) para staging del job.</li>
+                        <li>Se verificó el IAM policy del proyecto: el usuario solo tenía rol Editor, sin <code>dataflow.admin</code>.</li>
+                        <li><strong>Intento 1 (fallido):</strong> Se lanzó el job <code>job1</code> (Word_Count). Falló con <code>PERMISSION_DENIED: dataflow.jobs.create</code>.</li>
+                        <li>Se asignó el rol <code>roles/dataflow.admin</code> al usuario.</li>
+                        <li><strong>Retry exitoso:</strong> Se lanzó <code>job1</code> de nuevo. Job completado en ~5 min. WordCount de King Lear ejecutado.</li>
+                        <li><strong>Intento 2 (fallido):</strong> Se lanzó <code>job2</code> con <code>--disable-public-ips</code>. Falló porque los workers no podían acceder a APIs de GCS/Dataflow sin IPs públicas (Private Google Access deshabilitado).</li>
+                        <li>Se asignó el rol <code>roles/compute.networkAdmin</code> al usuario.</li>
+                        <li>Se habilitó Private Google Access en la subnet <code>default</code>: <code>gcloud compute networks subnets update default --region=us-central1 --enable-private-ip-google-access</code>.</li>
+                        <li><strong>Retry exitoso:</strong> Se lanzó <code>job2</code> de nuevo con <code>--disable-public-ips</code>. Job completado. VMs lanzadas sin IP externa y eliminadas al terminar.</li>
+                    </ol>
+                </div>
+                <div class="concept-box">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <strong>Concepto clave:</strong> Private Google Access (PGA) permite que las VMs sin IP pública accedan a las APIs de Google (GCS, BigQuery, etc.) a través de la red interna de Google. Sin PGA, las VMs con <code>--disable-public-ips</code> no pueden comunicarse con los servicios de Google. Los roles IAM (<code>dataflow.admin</code>, <code>compute.networkAdmin</code>) son necesarios para crear jobs y modificar configuraciones de red.
+                </div>
+                <div class="result-box">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <strong>Resultado:</strong> <code>job1</code> exitoso tras asignar <code>dataflow.admin</code>. <code>job2</code> exitoso tras habilitar PGA y asignar <code>compute.networkAdmin</code>. VMs sin IP pública funcionando correctamente.
+                </div>
+            </div>
+
+        </div>
+
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <h2><i class="fa-solid fa-list-check"></i> Proyectos</h2>
+            <div class="sidebar-item active" onclick="showLab(1)" id="side01">
+                <span class="num">1</span> Dataflow Qwik Start - Python
+            </div>
+            <div class="sidebar-item" onclick="showLab(2)" id="side02">
+                <span class="num">2</span> Dataflow Qwik Start - Templates
+            </div>
+            <div class="sidebar-item" onclick="showLab(3)" id="side03">
+                <span class="num">3</span> Data Quality con Serverless Spark
+            </div>
+            <div class="sidebar-item" onclick="showLab(4)" id="side04">
+                <span class="num">4</span> Batch Pipelines en CDF
+            </div>
+            <div class="sidebar-item" onclick="showLab(5)" id="side05">
+                <span class="num">5</span> ETL con Dataflow y BigQuery
+            </div>
+            <div class="sidebar-item" onclick="showLab(6)" id="side06">
+                <span class="num">6</span> Getting Started with CDF
+            </div>
+            <div class="sidebar-item" onclick="showLab(7)" id="side07">
+                <span class="num">7</span> Wrangler Transformations
+            </div>
+            <div class="sidebar-item" onclick="showLab(8)" id="side08">
+                <span class="num">8</span> Batch Pipelines (GSP807)
+            </div>
+            <div class="sidebar-item" onclick="showLab(9)" id="side09">
+                <span class="num">9</span> Realtime Pipelines en CDF
+            </div>
+            <div class="sidebar-item" onclick="showLab(10)" id="side10">
+                <span class="num">10</span> Beam + Bigtable Enrichment
+            </div>
+            <div class="sidebar-item" onclick="showLab(11)" id="side11">
+                <span class="num">11</span> Stream E-sports Data
+            </div>
+            <div class="sidebar-item" onclick="showLab(12)" id="side12">
+                <span class="num">12</span> Stream Processing Pub/Sub + Dataflow
+            </div>
+            <div class="sidebar-item" onclick="showLab(13)" id="side13">
+                <span class="num">13</span> Streaming Pipeline con Kafka
+            </div>
+            <div class="sidebar-item" onclick="showLab(14)" id="side14">
+                <span class="num">14</span> IAM y Networking para Dataflow
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLab = 1;
+
+        function showLab(n) {
+            // Ocultar todos los proyectos
+            document.querySelectorAll('.lab-card').forEach(card => card.classList.remove('active'));
+            // Mostrar el proyecto seleccionado
+            document.getElementById('lab' + String(n).padStart(2, '0')).classList.add('active');
+
+            // Actualizar sidebar
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.getElementById('side' + String(n).padStart(2, '0')).classList.add('active');
+
+            // Marcar como completados los anteriores
+            for (let i = 1; i <= 14; i++) {
+                const side = document.getElementById('side' + String(i).padStart(2, '0'));
+                if (i < n) {
+                    side.classList.add('completed');
+                } else {
+                    side.classList.remove('completed');
+                }
+            }
+
+            currentLab = n;
+        }
+
+        // Inicializar
+        showLab(1);
+    </script>
+</body>
+</html>
